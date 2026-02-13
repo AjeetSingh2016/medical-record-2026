@@ -1,18 +1,27 @@
-import { Text, View } from "@/components/Themed";
-import { getFamilyMembers, updateFamilyMember } from "@/lib/database";
+import { useColorScheme } from "@/components/useColorScheme";
+import {
+  deleteFamilyMember,
+  getFamilyMembers,
+  updateFamilyMember,
+} from "@/lib/database";
 import { useAuth } from "@/lib/useAuth";
+import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const RELATIONS = [
   "Father",
@@ -24,17 +33,39 @@ const RELATIONS = [
   "Sister",
   "Other",
 ];
+
 const GENDERS = ["Male", "Female", "Other"];
+
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 export default function EditFamilyMemberScreen() {
   const { session } = useAuth();
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const insets = useSafeAreaInsets();
+  const colorScheme = useColorScheme();
+
+  const isDark = colorScheme === "dark";
+
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
+
+  const [showRelationModal, setShowRelationModal] = useState(false);
+  const [showGenderModal, setShowGenderModal] = useState(false);
+  const [showBloodGroupModal, setShowBloodGroupModal] = useState(false);
+
+  const [hasChanges, setHasChanges] = useState(false);
+
+  const [originalData, setOriginalData] = useState({
+    full_name: "",
+    relation: "",
+    dob: "",
+    gender: "",
+    blood_group: "",
+  });
+
   const [formData, setFormData] = useState({
     full_name: "",
     relation: "",
@@ -43,49 +74,63 @@ export default function EditFamilyMemberScreen() {
     blood_group: "",
   });
 
+  // Theme-aware colors
+  const colors = {
+    background: isDark ? "#0f0f0f" : "#f5f5f7",
+    card: isDark ? "#1c1c1e" : "#ffffff",
+    text: isDark ? "#f5f5f7" : "#1f2937",
+    textSecondary: isDark ? "#9ca3af" : "#6b7280",
+    inputBg: isDark ? "#2d2d2f" : "#f3f4f6",
+    border: isDark ? "#374151" : "#d1d5db",
+    primary: "#0891b2",
+    danger: "#ef4444",
+    disabled: isDark ? "#4b5563" : "#9ca3af",
+  };
+
   useEffect(() => {
     if (session?.user?.id && id) {
       loadMemberData();
     }
-  }, [id, session]);
+  }, [id, session?.user?.id]);
+
+  useEffect(() => {
+    setHasChanges(JSON.stringify(formData) !== JSON.stringify(originalData));
+  }, [formData, originalData]);
 
   const loadMemberData = async () => {
-    console.log("Loading member with id:", id);
-    console.log("Session:", session?.user?.id);
+    if (!session?.user?.id || !id) return;
 
-    if (!session?.user?.id || !id) {
-      console.log("Missing session or id");
-      return; // Don't set loadingData to false here
-    }
-
+    setLoadingData(true);
     const { data, error } = await getFamilyMembers(session.user.id);
-    console.log("Family members data:", data);
-    console.log("Error:", error);
 
-    if (error) {
-      Alert.alert("Error", "Failed to load member data");
+    if (error || !data) {
+      Alert.alert("Error", "Failed to load family member data");
       router.back();
       return;
     }
 
-    const member = data?.find((m) => m.id === id);
-    console.log("Found member:", member);
-
-    if (member) {
-      setFormData({
-        full_name: member.full_name,
-        relation: member.relation || "",
-        dob: member.dob || "",
-        gender: member.gender || "",
-        blood_group: member.blood_group || "",
-      });
-      if (member.dob) {
-        setSelectedDate(new Date(member.dob));
-      }
-    } else {
-      Alert.alert("Error", "Member not found");
+    const member = data.find((m) => m.id === id);
+    if (!member) {
+      Alert.alert("Error", "Family member not found");
       router.back();
+      return;
     }
+
+    const loaded = {
+      full_name: member.full_name || "",
+      relation: member.relation || "",
+      dob: member.dob || "",
+      gender: member.gender || "",
+      blood_group: member.blood_group || "",
+    };
+
+    setFormData(loaded);
+    setOriginalData(loaded);
+
+    if (member.dob) {
+      setSelectedDate(new Date(member.dob));
+    }
+
     setLoadingData(false);
   };
 
@@ -93,25 +138,38 @@ export default function EditFamilyMemberScreen() {
     if (Platform.OS === "android") {
       setShowDatePicker(false);
     }
-
     if (date) {
       setSelectedDate(date);
-      const formattedDate = date.toISOString().split("T")[0];
-      setFormData({ ...formData, dob: formattedDate });
+      setFormData({
+        ...formData,
+        dob: date.toISOString().split("T")[0],
+      });
+    }
+  };
+
+  const formatDisplayDate = (dateStr: string) => {
+    if (!dateStr) return "";
+    try {
+      return new Date(dateStr).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+    } catch {
+      return "";
     }
   };
 
   const handleSubmit = async () => {
-    if (!id) return;
-
+    if (!id || !hasChanges) return;
     if (!formData.full_name.trim()) {
-      Alert.alert("Error", "Please enter full name");
+      Alert.alert("Required", "Full name is required");
       return;
     }
 
     setLoading(true);
 
-    const { data, error } = await updateFamilyMember(id as string, {
+    const { error } = await updateFamilyMember(id, {
       full_name: formData.full_name.trim(),
       relation: formData.relation || undefined,
       dob: formData.dob || undefined,
@@ -122,259 +180,528 @@ export default function EditFamilyMemberScreen() {
     setLoading(false);
 
     if (error) {
-      Alert.alert("Error", "Failed to update family member");
+      Alert.alert("Error", "Could not update family member");
       console.error(error);
     } else {
-      Alert.alert("Success", "Family member updated successfully");
+      Alert.alert("Success", "Family member updated");
       router.back();
     }
   };
 
+  const handleDelete = () => {
+    Alert.alert(
+      "Delete Member",
+      "This action cannot be undone. Delete this family member?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            const { error } = await deleteFamilyMember(id as string);
+            if (error) {
+              Alert.alert("Error", "Failed to delete member");
+            } else {
+              Alert.alert("Deleted", "Family member removed");
+              router.back();
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const renderModal = (
+    visible: boolean,
+    onClose: () => void,
+    options: string[],
+    selected: string,
+    onSelect: (val: string) => void,
+    title: string,
+  ) => (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <TouchableOpacity
+        style={[styles.modalOverlay, { backgroundColor: "rgba(0,0,0,0.6)" }]}
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <View
+          style={[
+            styles.modalContent,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.modalTitle, { color: colors.text }]}>
+            {title}
+          </Text>
+
+          <ScrollView style={styles.optionsList}>
+            {options.map((opt) => (
+              <TouchableOpacity
+                key={opt}
+                style={[
+                  styles.optionItem,
+                  {
+                    backgroundColor:
+                      selected === opt ? colors.inputBg : "transparent",
+                  },
+                ]}
+                onPress={() => {
+                  onSelect(opt);
+                  onClose();
+                }}
+              >
+                <Text
+                  style={[
+                    styles.optionText,
+                    { color: selected === opt ? colors.primary : colors.text },
+                  ]}
+                >
+                  {opt}
+                </Text>
+                {selected === opt && (
+                  <Ionicons name="checkmark" size={20} color={colors.primary} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+
   if (loadingData) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" />
+      <View
+        style={[
+          styles.loadingContainer,
+          { backgroundColor: colors.background },
+        ]}
+      >
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Edit Family Member</Text>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Full Name *</Text>
-        <TextInput
-          style={styles.input}
-          value={formData.full_name}
-          onChangeText={(text) => setFormData({ ...formData, full_name: text })}
-          placeholder="Enter full name"
-        />
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Relation</Text>
-        <View style={styles.chipContainer}>
-          {RELATIONS.map((rel) => (
-            <TouchableOpacity
-              key={rel}
-              style={[
-                styles.chip,
-                formData.relation === rel && styles.chipSelected,
-              ]}
-              onPress={() => setFormData({ ...formData, relation: rel })}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  formData.relation === rel && styles.chipTextSelected,
-                ]}
-              >
-                {rel}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Date of Birth</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Header */}
+      <View
+        style={[
+          styles.header,
+          {
+            paddingTop: insets.top,
+            backgroundColor: colors.background,
+            borderBottomColor: colors.border,
+          },
+        ]}
+      >
         <TouchableOpacity
-          style={styles.dateButton}
-          onPress={() => setShowDatePicker(true)}
+          onPress={() => router.back()}
+          style={styles.backButton}
         >
-          <Text style={styles.dateButtonText}>
-            {formData.dob || "Select Date"}
-          </Text>
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-
-        {showDatePicker && (
-          <DateTimePicker
-            value={selectedDate}
-            mode="date"
-            display={Platform.OS === "ios" ? "spinner" : "default"}
-            onChange={handleDateChange}
-            maximumDate={new Date()}
-          />
-        )}
-
-        {Platform.OS === "ios" && showDatePicker && (
-          <TouchableOpacity
-            style={styles.doneButton}
-            onPress={() => setShowDatePicker(false)}
-          >
-            <Text style={styles.doneButtonText}>Done</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Gender</Text>
-        <View style={styles.chipContainer}>
-          {GENDERS.map((gender) => (
-            <TouchableOpacity
-              key={gender}
-              style={[
-                styles.chip,
-                formData.gender === gender && styles.chipSelected,
-              ]}
-              onPress={() => setFormData({ ...formData, gender })}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  formData.gender === gender && styles.chipTextSelected,
-                ]}
-              >
-                {gender}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Blood Group</Text>
-        <View style={styles.chipContainer}>
-          {BLOOD_GROUPS.map((bg) => (
-            <TouchableOpacity
-              key={bg}
-              style={[
-                styles.chip,
-                formData.blood_group === bg && styles.chipSelected,
-              ]}
-              onPress={() => setFormData({ ...formData, blood_group: bg })}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  formData.blood_group === bg && styles.chipTextSelected,
-                ]}
-              >
-                {bg}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      <TouchableOpacity
-        style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-        onPress={handleSubmit}
-        disabled={loading}
-      >
-        <Text style={styles.submitButtonText}>
-          {loading ? "Updating..." : "Update Family Member"}
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          Edit Member
         </Text>
-      </TouchableOpacity>
+        <View style={{ width: 24 }} />
+      </View>
 
-      <TouchableOpacity
-        style={styles.cancelButton}
-        onPress={() => router.back()}
-      >
-        <Text style={styles.cancelButtonText}>Cancel</Text>
-      </TouchableOpacity>
-    </ScrollView>
+      <ScrollView style={styles.scrollView}>
+        <View style={[styles.formCard, { backgroundColor: colors.card }]}>
+          {/* Full Name */}
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              Full Name *
+            </Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.inputBg,
+                  color: colors.text,
+                  borderColor: colors.border,
+                },
+              ]}
+              value={formData.full_name}
+              onChangeText={(text) =>
+                setFormData({ ...formData, full_name: text })
+              }
+              placeholder="Full name"
+              placeholderTextColor={colors.textSecondary}
+              autoCapitalize="words"
+            />
+          </View>
+
+          {/* Date of Birth */}
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              Date of Birth
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.input,
+                styles.dateInput,
+                { backgroundColor: colors.inputBg },
+              ]}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text
+                style={[
+                  styles.dateText,
+                  { color: formData.dob ? colors.text : colors.textSecondary },
+                ]}
+              >
+                {formData.dob ? formatDisplayDate(formData.dob) : "Select date"}
+              </Text>
+              <Ionicons
+                name="calendar-outline"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+
+            {showDatePicker && (
+              <DateTimePicker
+                value={selectedDate}
+                mode="date"
+                display={Platform.OS === "ios" ? "spinner" : "default"}
+                onChange={handleDateChange}
+                maximumDate={new Date()}
+                textColor={isDark ? "white" : undefined}
+              />
+            )}
+
+            {Platform.OS === "ios" && showDatePicker && (
+              <TouchableOpacity
+                style={[styles.doneButton, { backgroundColor: colors.primary }]}
+                onPress={() => setShowDatePicker(false)}
+              >
+                <Text style={styles.doneButtonText}>Done</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Relationship */}
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              Relationship
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.input,
+                styles.dropdown,
+                { backgroundColor: colors.inputBg },
+              ]}
+              onPress={() => setShowRelationModal(true)}
+            >
+              <Text
+                style={[
+                  styles.dropdownText,
+                  {
+                    color: formData.relation
+                      ? colors.text
+                      : colors.textSecondary,
+                  },
+                ]}
+              >
+                {formData.relation || "Select relationship"}
+              </Text>
+              <Ionicons
+                name="chevron-down"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Gender */}
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              Gender
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.input,
+                styles.dropdown,
+                { backgroundColor: colors.inputBg },
+              ]}
+              onPress={() => setShowGenderModal(true)}
+            >
+              <Text
+                style={[
+                  styles.dropdownText,
+                  {
+                    color: formData.gender ? colors.text : colors.textSecondary,
+                  },
+                ]}
+              >
+                {formData.gender || "Select gender"}
+              </Text>
+              <Ionicons
+                name="chevron-down"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Blood Group */}
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              Blood Group
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.input,
+                styles.dropdown,
+                { backgroundColor: colors.inputBg },
+              ]}
+              onPress={() => setShowBloodGroupModal(true)}
+            >
+              <Text
+                style={[
+                  styles.dropdownText,
+                  {
+                    color: formData.blood_group
+                      ? colors.text
+                      : colors.textSecondary,
+                  },
+                ]}
+              >
+                {formData.blood_group || "Select blood group"}
+              </Text>
+              <Ionicons
+                name="chevron-down"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Action Buttons */}
+        <View style={styles.buttonsContainer}>
+          <TouchableOpacity
+            style={[
+              styles.primaryButton,
+              { backgroundColor: colors.primary },
+              (!hasChanges || loading) && styles.buttonDisabled,
+            ]}
+            onPress={handleSubmit}
+            disabled={!hasChanges || loading}
+          >
+            <Text style={styles.primaryButtonText}>
+              {loading ? "Updating..." : "Save Changes"}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.secondaryButton,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+              },
+            ]}
+            onPress={() => router.back()}
+          >
+            <Text style={[styles.secondaryButtonText, { color: colors.text }]}>
+              Cancel
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+            <Text style={styles.deleteButtonText}>Delete Member</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      {/* Modals */}
+      {renderModal(
+        showRelationModal,
+        () => setShowRelationModal(false),
+        RELATIONS,
+        formData.relation,
+        (v) => setFormData({ ...formData, relation: v }),
+        "Relationship",
+      )}
+
+      {renderModal(
+        showGenderModal,
+        () => setShowGenderModal(false),
+        GENDERS,
+        formData.gender,
+        (v) => setFormData({ ...formData, gender: v }),
+        "Gender",
+      )}
+
+      {renderModal(
+        showBloodGroupModal,
+        () => setShowBloodGroupModal(false),
+        BLOOD_GROUPS,
+        formData.blood_group,
+        (v) => setFormData({ ...formData, blood_group: v }),
+        "Blood Group",
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+  },
+  backButton: {
+    padding: 4,
+  },
+  headerTitle: {
+    fontSize: 19,
+    fontWeight: "600",
+  },
+  scrollView: {
+    flex: 1,
+  },
+  formCard: {
+    margin: 16,
+    borderRadius: 16,
     padding: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 20,
-  },
-  formGroup: {
-    marginBottom: 20,
+  field: {
+    marginBottom: 24,
   },
   label: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 14,
+    fontWeight: "500",
     marginBottom: 8,
   },
   input: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 16,
-    backgroundColor: "#fff",
-  },
-  dateButton: {
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    padding: 12,
-    backgroundColor: "#fff",
   },
-  dateButtonText: {
+  dateInput: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  dateText: {
     fontSize: 16,
-    color: "#333",
+  },
+  dropdown: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  dropdownText: {
+    fontSize: 16,
   },
   doneButton: {
-    backgroundColor: "#007AFF",
-    padding: 10,
-    borderRadius: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: "center",
-    marginTop: 10,
+    marginTop: 12,
   },
   doneButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  chipContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    backgroundColor: "#fff",
-  },
-  chipSelected: {
-    backgroundColor: "#007AFF",
-    borderColor: "#007AFF",
-  },
-  chipText: {
-    fontSize: 14,
-    color: "#333",
-  },
-  chipTextSelected: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  submitButton: {
-    backgroundColor: "#007AFF",
-    padding: 15,
-    borderRadius: 10,
-    alignItems: "center",
-    marginTop: 10,
-  },
-  submitButtonDisabled: {
-    backgroundColor: "#ccc",
-  },
-  submitButtonText: {
     color: "white",
     fontSize: 16,
     fontWeight: "600",
   },
-  cancelButton: {
-    padding: 15,
-    borderRadius: 10,
-    alignItems: "center",
-    marginTop: 10,
+  buttonsContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 32,
+    gap: 12,
   },
-  cancelButtonText: {
-    color: "#666",
+  primaryButton: {
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: "center",
+  },
+  primaryButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  secondaryButton: {
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: "center",
+    borderWidth: 1,
+  },
+  secondaryButtonText: {
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  deleteButton: {
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  deleteButtonText: {
+    color: "#ef4444",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  buttonDisabled: {
+    opacity: 0.55,
+  },
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: "84%",
+    maxHeight: "70%",
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  optionsList: {
+    maxHeight: 340,
+  },
+  optionItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    marginVertical: 2,
+  },
+  optionText: {
     fontSize: 16,
   },
 });

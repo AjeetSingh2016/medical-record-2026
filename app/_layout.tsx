@@ -12,7 +12,10 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
+import { ActivityIndicator, StatusBar, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import "../global.css";
 
 export {
@@ -60,19 +63,61 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
   const { session, loading } = useAuth();
 
+  // Show loading spinner while checking auth state
   if (loading) {
-    return null; // Or a loading screen
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: colorScheme === "dark" ? "#000" : "#fff",
+        }}
+      >
+        <StatusBar
+          barStyle={colorScheme === "dark" ? "light-content" : "dark-content"}
+        />
+        <ActivityIndicator size="large" color="#0891b2" />
+      </View>
+    );
   }
 
   return (
-    <ActiveMemberProvider>
-      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="auth" options={{ headerShown: false }} />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: "modal" }} />
-        </Stack>
-      </ThemeProvider>
-    </ActiveMemberProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <StatusBar
+        barStyle={colorScheme === "dark" ? "light-content" : "dark-content"}
+        backgroundColor={colorScheme === "dark" ? "#000" : "#fff"}
+      />
+      <SafeAreaProvider>
+        <SafeAreaView style={{ flex: 1 }} edges={["left", "right"]}>
+          <ActiveMemberProvider>
+            <ThemeProvider
+              value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
+            >
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                }}
+              >
+                <Stack.Screen name="auth" />
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen
+                  name="modal"
+                  options={{ presentation: "modal" }}
+                />
+                <Stack.Screen
+                  name="edit-family-member"
+                  options={{ title: "Edit Member" }}
+                />
+                <Stack.Screen
+                  name="add-family-member"
+                  options={{ title: "Add Member" }}
+                />
+              </Stack>
+            </ThemeProvider>
+          </ActiveMemberProvider>
+        </SafeAreaView>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

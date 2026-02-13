@@ -1,17 +1,22 @@
-import { Text, View } from "@/components/Themed";
+import { useColorScheme } from "@/components/useColorScheme";
 import { createFamilyMember } from "@/lib/database";
 import { useAuth } from "@/lib/useAuth";
+import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-    Alert,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
+  Alert,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const RELATIONS = [
   "Father",
@@ -23,15 +28,27 @@ const RELATIONS = [
   "Sister",
   "Other",
 ];
+
 const GENDERS = ["Male", "Female", "Other"];
+
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 export default function AddFamilyMemberScreen() {
   const { session } = useAuth();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const colorScheme = useColorScheme();
+
+  const isDark = colorScheme === "dark";
+
   const [loading, setLoading] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
+
+  const [showRelationModal, setShowRelationModal] = useState(false);
+  const [showGenderModal, setShowGenderModal] = useState(false);
+  const [showBloodGroupModal, setShowBloodGroupModal] = useState(false);
+
   const [formData, setFormData] = useState({
     full_name: "",
     relation: "",
@@ -40,29 +57,52 @@ export default function AddFamilyMemberScreen() {
     blood_group: "",
   });
 
+  // Theme colors — matching Edit screen
+  const colors = {
+    background: isDark ? "#0f0f0f" : "#f5f5f7",
+    card: isDark ? "#1c1c1e" : "#ffffff",
+    text: isDark ? "#f5f5f7" : "#1f2937",
+    textSecondary: isDark ? "#9ca3af" : "#6b7280",
+    inputBg: isDark ? "#2d2d2f" : "#f3f4f6",
+    border: isDark ? "#374151" : "#d1d5db",
+    primary: "#0891b2",
+    danger: "#ef4444",
+  };
+
+  const isFormValid = !!formData.full_name.trim();
+
   const handleDateChange = (event: any, date?: Date) => {
     if (Platform.OS === "android") {
       setShowDatePicker(false);
     }
-
     if (date) {
       setSelectedDate(date);
-      const formattedDate = date.toISOString().split("T")[0]; // YYYY-MM-DD
-      setFormData({ ...formData, dob: formattedDate });
+      setFormData({
+        ...formData,
+        dob: date.toISOString().split("T")[0],
+      });
+    }
+  };
+
+  const formatDisplayDate = (dateStr: string) => {
+    if (!dateStr) return "Select date";
+    try {
+      return new Date(dateStr).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+    } catch {
+      return "Select date";
     }
   };
 
   const handleSubmit = async () => {
-    if (!session?.user?.id) return;
-
-    if (!formData.full_name.trim()) {
-      Alert.alert("Error", "Please enter full name");
-      return;
-    }
+    if (!session?.user?.id || !isFormValid) return;
 
     setLoading(true);
 
-    const { data, error } = await createFamilyMember({
+    const { error } = await createFamilyMember({
       user_id: session.user.id,
       full_name: formData.full_name.trim(),
       relation: formData.relation || undefined,
@@ -77,248 +117,474 @@ export default function AddFamilyMemberScreen() {
       Alert.alert("Error", "Failed to add family member");
       console.error(error);
     } else {
-      Alert.alert("Success", "Family member added successfully");
+      Alert.alert("Success", "Family member added");
       router.back();
     }
   };
 
-  return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Add Family Member</Text>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Full Name *</Text>
-        <TextInput
-          style={styles.input}
-          value={formData.full_name}
-          onChangeText={(text) => setFormData({ ...formData, full_name: text })}
-          placeholder="Enter full name"
-        />
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Relation</Text>
-        <View style={styles.chipContainer}>
-          {RELATIONS.map((rel) => (
-            <TouchableOpacity
-              key={rel}
-              style={[
-                styles.chip,
-                formData.relation === rel && styles.chipSelected,
-              ]}
-              onPress={() => setFormData({ ...formData, relation: rel })}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  formData.relation === rel && styles.chipTextSelected,
-                ]}
-              >
-                {rel}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Date of Birth</Text>
-        <TouchableOpacity
-          style={styles.dateButton}
-          onPress={() => setShowDatePicker(true)}
+  const renderDropdownModal = (
+    visible: boolean,
+    onClose: () => void,
+    options: string[],
+    selectedValue: string,
+    onSelect: (value: string) => void,
+    title: string,
+  ) => (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <TouchableOpacity
+        style={[styles.modalOverlay, { backgroundColor: "rgba(0,0,0,0.6)" }]}
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <View
+          style={[
+            styles.modalContent,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
         >
-          <Text style={styles.dateButtonText}>
-            {formData.dob || "Select Date"}
+          <Text style={[styles.modalTitle, { color: colors.text }]}>
+            {title}
           </Text>
+
+          <ScrollView style={styles.optionsList}>
+            {options.map((option) => (
+              <TouchableOpacity
+                key={option} // ← fixed: unique key using option value
+                style={[
+                  styles.optionItem,
+                  {
+                    backgroundColor:
+                      selectedValue === option ? colors.inputBg : "transparent",
+                  },
+                ]}
+                onPress={() => {
+                  onSelect(option);
+                  onClose();
+                }}
+              >
+                <Text
+                  style={[
+                    styles.optionText,
+                    {
+                      color:
+                        selectedValue === option ? colors.primary : colors.text,
+                    },
+                  ]}
+                >
+                  {option}
+                </Text>
+                {selectedValue === option && (
+                  <Ionicons name="checkmark" size={20} color={colors.primary} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Header */}
+      <View
+        style={[
+          styles.header,
+          {
+            paddingTop: insets.top,
+            backgroundColor: colors.card,
+            borderBottomColor: colors.border,
+          },
+        ]}
+      >
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-
-        {showDatePicker && (
-          <DateTimePicker
-            value={selectedDate}
-            mode="date"
-            display={Platform.OS === "ios" ? "spinner" : "default"}
-            onChange={handleDateChange}
-            maximumDate={new Date()}
-          />
-        )}
-
-        {Platform.OS === "ios" && showDatePicker && (
-          <TouchableOpacity
-            style={styles.doneButton}
-            onPress={() => setShowDatePicker(false)}
-          >
-            <Text style={styles.doneButtonText}>Done</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Gender</Text>
-        <View style={styles.chipContainer}>
-          {GENDERS.map((gender) => (
-            <TouchableOpacity
-              key={gender}
-              style={[
-                styles.chip,
-                formData.gender === gender && styles.chipSelected,
-              ]}
-              onPress={() => setFormData({ ...formData, gender })}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  formData.gender === gender && styles.chipTextSelected,
-                ]}
-              >
-                {gender}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Blood Group</Text>
-        <View style={styles.chipContainer}>
-          {BLOOD_GROUPS.map((bg) => (
-            <TouchableOpacity
-              key={bg}
-              style={[
-                styles.chip,
-                formData.blood_group === bg && styles.chipSelected,
-              ]}
-              onPress={() => setFormData({ ...formData, blood_group: bg })}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  formData.blood_group === bg && styles.chipTextSelected,
-                ]}
-              >
-                {bg}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      <TouchableOpacity
-        style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-        onPress={handleSubmit}
-        disabled={loading}
-      >
-        <Text style={styles.submitButtonText}>
-          {loading ? "Adding..." : "Add Family Member"}
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          Add Family Member
         </Text>
-      </TouchableOpacity>
+        <View style={{ width: 24 }} />
+      </View>
 
-      <TouchableOpacity
-        style={styles.cancelButton}
-        onPress={() => router.back()}
-      >
-        <Text style={styles.cancelButtonText}>Cancel</Text>
-      </TouchableOpacity>
-    </ScrollView>
+      <ScrollView style={styles.scrollView}>
+        <View style={[styles.formCard, { backgroundColor: colors.card }]}>
+          {/* Full Name */}
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              Full Name *
+            </Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.inputBg,
+                  color: colors.text,
+                  borderColor: colors.border,
+                },
+              ]}
+              value={formData.full_name}
+              onChangeText={(text) =>
+                setFormData({ ...formData, full_name: text })
+              }
+              placeholder="Full name"
+              placeholderTextColor={colors.textSecondary}
+              autoCapitalize="words"
+            />
+          </View>
+
+          {/* Date of Birth */}
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              Date of Birth
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.input,
+                styles.dateInput,
+                { backgroundColor: colors.inputBg },
+              ]}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text
+                style={[
+                  styles.dateText,
+                  { color: formData.dob ? colors.text : colors.textSecondary },
+                ]}
+              >
+                {formatDisplayDate(formData.dob)}
+              </Text>
+              <Ionicons
+                name="calendar-outline"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+
+            {showDatePicker && (
+              <DateTimePicker
+                value={selectedDate}
+                mode="date"
+                display={Platform.OS === "ios" ? "spinner" : "default"}
+                onChange={handleDateChange}
+                maximumDate={new Date()}
+                textColor={isDark ? "white" : undefined}
+              />
+            )}
+
+            {Platform.OS === "ios" && showDatePicker && (
+              <TouchableOpacity
+                style={[styles.doneButton, { backgroundColor: colors.primary }]}
+                onPress={() => setShowDatePicker(false)}
+              >
+                <Text style={styles.doneButtonText}>Done</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Relationship Dropdown */}
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              Relationship
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.input,
+                styles.dropdown,
+                { backgroundColor: colors.inputBg },
+              ]}
+              onPress={() => setShowRelationModal(true)}
+            >
+              <Text
+                style={[
+                  styles.dropdownText,
+                  {
+                    color: formData.relation
+                      ? colors.text
+                      : colors.textSecondary,
+                  },
+                ]}
+              >
+                {formData.relation || "Select relationship"}
+              </Text>
+              <Ionicons
+                name="chevron-down"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Gender Dropdown */}
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              Gender
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.input,
+                styles.dropdown,
+                { backgroundColor: colors.inputBg },
+              ]}
+              onPress={() => setShowGenderModal(true)}
+            >
+              <Text
+                style={[
+                  styles.dropdownText,
+                  {
+                    color: formData.gender ? colors.text : colors.textSecondary,
+                  },
+                ]}
+              >
+                {formData.gender || "Select gender"}
+              </Text>
+              <Ionicons
+                name="chevron-down"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Blood Group Dropdown */}
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              Blood Group
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.input,
+                styles.dropdown,
+                { backgroundColor: colors.inputBg },
+              ]}
+              onPress={() => setShowBloodGroupModal(true)}
+            >
+              <Text
+                style={[
+                  styles.dropdownText,
+                  {
+                    color: formData.blood_group
+                      ? colors.text
+                      : colors.textSecondary,
+                  },
+                ]}
+              >
+                {formData.blood_group || "Select blood group"}
+              </Text>
+              <Ionicons
+                name="chevron-down"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Buttons */}
+        <View style={styles.buttonsContainer}>
+          <TouchableOpacity
+            style={[
+              styles.primaryButton,
+              { backgroundColor: colors.primary },
+              (!isFormValid || loading) && styles.buttonDisabled,
+            ]}
+            onPress={handleSubmit}
+            disabled={!isFormValid || loading}
+          >
+            <Text style={styles.primaryButtonText}>
+              {loading ? "Adding..." : "Add Member"}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.secondaryButton,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+              },
+            ]}
+            onPress={() => router.back()}
+          >
+            <Text style={[styles.secondaryButtonText, { color: colors.text }]}>
+              Cancel
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      {/* Dropdown Modals */}
+      {renderDropdownModal(
+        showRelationModal,
+        () => setShowRelationModal(false),
+        RELATIONS,
+        formData.relation,
+        (value) => setFormData({ ...formData, relation: value }),
+        "Select Relationship",
+      )}
+
+      {renderDropdownModal(
+        showGenderModal,
+        () => setShowGenderModal(false),
+        GENDERS,
+        formData.gender,
+        (value) => setFormData({ ...formData, gender: value }),
+        "Select Gender",
+      )}
+
+      {renderDropdownModal(
+        showBloodGroupModal,
+        () => setShowBloodGroupModal(false),
+        BLOOD_GROUPS,
+        formData.blood_group,
+        (value) => setFormData({ ...formData, blood_group: value }),
+        "Select Blood Group",
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+  },
+  backButton: {
+    padding: 4,
+  },
+  headerTitle: {
+    fontSize: 19,
+    fontWeight: "600",
+  },
+  scrollView: {
+    flex: 1,
+  },
+  formCard: {
+    margin: 16,
+    borderRadius: 16,
     padding: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 20,
-  },
-  formGroup: {
-    marginBottom: 20,
+  field: {
+    marginBottom: 24,
   },
   label: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 14,
+    fontWeight: "500",
     marginBottom: 8,
   },
   input: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 16,
-    backgroundColor: "#fff",
-  },
-  dateButton: {
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    padding: 12,
-    backgroundColor: "#fff",
   },
-  dateButtonText: {
+  dateInput: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  dateText: {
     fontSize: 16,
-    color: "#333",
+  },
+  dropdown: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  dropdownText: {
+    fontSize: 16,
   },
   doneButton: {
-    backgroundColor: "#007AFF",
-    padding: 10,
-    borderRadius: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: "center",
-    marginTop: 10,
+    marginTop: 12,
   },
   doneButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  chipContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    backgroundColor: "#fff",
-  },
-  chipSelected: {
-    backgroundColor: "#007AFF",
-    borderColor: "#007AFF",
-  },
-  chipText: {
-    fontSize: 14,
-    color: "#333",
-  },
-  chipTextSelected: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  submitButton: {
-    backgroundColor: "#007AFF",
-    padding: 15,
-    borderRadius: 10,
-    alignItems: "center",
-    marginTop: 10,
-  },
-  submitButtonDisabled: {
-    backgroundColor: "#ccc",
-  },
-  submitButtonText: {
     color: "white",
     fontSize: 16,
     fontWeight: "600",
   },
-  cancelButton: {
-    padding: 15,
-    borderRadius: 10,
-    alignItems: "center",
-    marginTop: 10,
+  buttonsContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 32,
+    gap: 12,
   },
-  cancelButtonText: {
-    color: "#666",
+  primaryButton: {
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: "center",
+  },
+  primaryButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  secondaryButton: {
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: "center",
+    borderWidth: 1,
+  },
+  secondaryButtonText: {
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  buttonDisabled: {
+    opacity: 0.55,
+  },
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: "84%",
+    maxHeight: "70%",
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  optionsList: {
+    maxHeight: 340,
+  },
+  optionItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    marginVertical: 2,
+  },
+  optionText: {
     fontSize: 16,
   },
 });
