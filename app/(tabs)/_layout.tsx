@@ -1,13 +1,15 @@
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import BottomSheet from "@gorhom/bottom-sheet";
-import { Tabs } from "expo-router";
-import React, { useRef } from "react";
+import { Tabs, useRouter } from "expo-router";
+import React, { useRef, useState } from "react";
+import { Text, TouchableOpacity, View } from "react-native";
 
 import { CustomHeader } from "@/components/CustomHeader";
 import { ProfileBottomSheet } from "@/components/ProfileBottomSheet";
 import { useClientOnlyValue } from "@/components/useClientOnlyValue";
 import { useColorScheme } from "@/components/useColorScheme";
 import Colors from "@/constants/Colors";
+import { Ionicons } from "@expo/vector-icons";
 
 function TabBarIcon(props: {
   name: React.ComponentProps<typeof FontAwesome>["name"];
@@ -18,7 +20,9 @@ function TabBarIcon(props: {
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const router = useRouter();
   const bottomSheetRef = useRef<BottomSheet>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   return (
     <>
@@ -40,6 +44,55 @@ export default function TabLayout() {
             ),
           }}
         />
+
+        <Tabs.Screen
+          name="documents"
+          options={{
+            title: "documents",
+            tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color} />,
+            header: () => (
+              <CustomHeader
+                onProfilePress={() => bottomSheetRef.current?.expand()}
+              />
+            ),
+          }}
+        />
+
+        {/* Elevated Center Button */}
+        <Tabs.Screen
+          name="add"
+          options={{
+            title: "",
+            tabBarIcon: () => (
+              <View
+                style={{
+                  position: "absolute",
+                  bottom: 2,
+                  width: 60,
+                  height: 60,
+                  borderRadius: 30,
+                  backgroundColor: "#0891b2",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 4,
+                  elevation: 8,
+                }}
+              >
+                <Ionicons name="add" size={32} color="#fff" />
+              </View>
+            ),
+            tabBarButton: (props: any) => (
+              <TouchableOpacity
+                {...props}
+                onPress={() => setShowAddModal(true)}
+              />
+            ),
+          }}
+        />
+
         <Tabs.Screen
           name="family"
           options={{
@@ -53,13 +106,113 @@ export default function TabLayout() {
           name="profile"
           options={{
             title: "Profile",
-            headerShown: false,
             tabBarIcon: ({ color }) => <TabBarIcon name="user" color={color} />,
           }}
         />
       </Tabs>
 
       <ProfileBottomSheet bottomSheetRef={bottomSheetRef} />
+
+      {/* Add Content Type Modal */}
+      {showAddModal && (
+        <AddContentModal
+          visible={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          onSelect={(type) => {
+            setShowAddModal(false);
+            if (type === "diagnosis") {
+              router.push("/create-diagnosis");
+            }
+            // Others coming soon
+          }}
+        />
+      )}
     </>
+  );
+}
+
+// Add Content Type Selector Component
+function AddContentModal({
+  visible,
+  onClose,
+  onSelect,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onSelect: (type: string) => void;
+}) {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+
+  const options = [
+    { id: "diagnosis", icon: "medical", label: "Diagnosis", emoji: "🩺" },
+    { id: "test", icon: "flask", label: "Test", emoji: "🧪" },
+    { id: "visit", icon: "business", label: "Visit", emoji: "🏥" },
+    { id: "document", icon: "document-text", label: "Document", emoji: "📄" },
+  ];
+  return (
+    <TouchableOpacity
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        justifyContent: "flex-end",
+        zIndex: 1000,
+      }}
+      activeOpacity={1}
+      onPress={onClose}
+    >
+      <View
+        style={{
+          backgroundColor: isDark ? "#1a1a1a" : "#fff",
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          padding: 20,
+          paddingBottom: 40,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 20,
+            fontWeight: "600",
+            marginBottom: 20,
+            color: isDark ? "#fff" : "#000",
+          }}
+        >
+          What would you like to add?
+        </Text>
+
+        {options.map((option) => (
+          <TouchableOpacity
+            key={option.id}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              padding: 16,
+              backgroundColor: isDark ? "#2a2a2a" : "#f3f4f6",
+              borderRadius: 12,
+              marginBottom: 12,
+            }}
+            onPress={() => onSelect(option.id)}
+          >
+            <Text style={{ fontSize: 24, marginRight: 12 }}>
+              {option.emoji}
+            </Text>
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: "500",
+                color: isDark ? "#fff" : "#000",
+              }}
+            >
+              {option.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </TouchableOpacity>
   );
 }

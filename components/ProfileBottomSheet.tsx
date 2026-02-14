@@ -80,14 +80,11 @@ export function ProfileBottomSheet({
       ],
     );
   };
-  const allMembers = [
-    { id: session?.user?.id || "", type: "user" as const, label: "Self" },
-    ...familyMembers.map((m: FamilyMember) => ({
-      id: m.id,
-      type: "family" as const,
-      label: m.full_name,
-    })),
-  ];
+  const allMembers = familyMembers.map((m: FamilyMember) => ({
+    id: m.id,
+    type: m.relation === "Self" ? ("user" as const) : ("family" as const),
+    label: m.full_name,
+  }));
 
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";

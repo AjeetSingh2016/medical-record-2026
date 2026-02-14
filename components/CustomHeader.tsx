@@ -1,9 +1,9 @@
 import { useColorScheme } from "@/components/useColorScheme";
+import AntDesign from "@expo/vector-icons/AntDesign";
 import { useRouter } from "expo-router";
 import { Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ProfileSwitcher } from "./ProfileSwitcher";
-
 interface CustomHeaderProps {
   onProfilePress: () => void;
 }
@@ -57,7 +57,7 @@ export function CustomHeader({ onProfilePress }: CustomHeaderProps) {
               marginTop: -2,
             }}
           >
-            +
+            <AntDesign name="user-add" size={18} color="white" />
           </Text>
         </TouchableOpacity>
       </View>

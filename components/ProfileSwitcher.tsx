@@ -1,7 +1,7 @@
 import { useColorScheme } from "@/components/useColorScheme";
 import { useActiveMember } from "@/contexts/ActiveMemberContext";
+import EvilIcons from "@expo/vector-icons/EvilIcons";
 import { Text, TouchableOpacity } from "react-native";
-
 interface ProfileSwitcherProps {
   onPress: () => void;
 }
@@ -17,12 +17,14 @@ export function ProfileSwitcher({ onPress }: ProfileSwitcherProps) {
       style={{
         flexDirection: "row",
         alignItems: "center",
+        justifyContent: "center",
         backgroundColor: "#0891b2",
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 16,
       }}
     >
+      <EvilIcons name="user" size={24} color="white" />
       <Text
         style={{
           color: "white",
@@ -31,7 +33,8 @@ export function ProfileSwitcher({ onPress }: ProfileSwitcherProps) {
           marginRight: 4,
         }}
       >
-        👤 {activeMember?.label || "Select"}
+        {" "}
+        {activeMember?.label || "Select"}
       </Text>
       <Text style={{ color: "white", fontSize: 12 }}>▼</Text>
     </TouchableOpacity>

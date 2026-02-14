@@ -1,3 +1,4 @@
+import { getFamilyMembers } from "@/lib/database";
 import { useAuth } from "@/lib/useAuth";
 import React, { createContext, useContext, useEffect, useState } from "react";
 
@@ -26,15 +27,24 @@ export function ActiveMemberProvider({
   const { session } = useAuth();
   const [activeMember, setActiveMember] = useState<ActiveMember | null>(null);
 
-  // Default to Self when user logs in
+  // Load "Self" member from database and set as default
   useEffect(() => {
-    if (session?.user?.id && !activeMember) {
-      setActiveMember({
-        id: session.user.id,
-        type: "user",
-        label: "Self",
-      });
-    }
+    const loadSelfMember = async () => {
+      if (session?.user?.id && !activeMember) {
+        const { data } = await getFamilyMembers(session.user.id);
+        const selfMember = data?.find((m) => m.relation === "Self");
+
+        if (selfMember) {
+          setActiveMember({
+            id: selfMember.id,
+            type: "user",
+            label: selfMember.full_name,
+          });
+        }
+      }
+    };
+
+    loadSelfMember();
   }, [session]);
 
   return (
