@@ -1,17 +1,18 @@
 import { useColorScheme } from "@/components/useColorScheme";
 import { useActiveMember } from "@/contexts/ActiveMemberContext";
 import { deleteDiagnosis, getDiagnoses } from "@/lib/database";
+import { colors } from "@/lib/colors";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -80,13 +81,13 @@ export default function DiagnosesListScreen() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "Active":
-        return "#ef4444";
+        return colors.light.error;
       case "Resolved":
-        return "#10b981";
+        return colors.light.success;
       case "Monitoring":
-        return "#f59e0b";
+        return colors.light.warning;
       default:
-        return "#6b7280";
+        return colors.light.textTertiary;
     }
   };
 
@@ -107,23 +108,32 @@ export default function DiagnosesListScreen() {
           flex: 1,
           justifyContent: "center",
           alignItems: "center",
-          backgroundColor: isDark ? "#0a0a0a" : "#f3f4f6",
+          backgroundColor: isDark
+            ? colors.dark.background
+            : colors.light.background,
         }}
       >
-        <ActivityIndicator size="large" color="#0891b2" />
+        <ActivityIndicator size="large" color={colors.light.primary} />
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: isDark ? "#0a0a0a" : "#f3f4f6" }}>
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: isDark
+          ? colors.dark.background
+          : colors.light.background,
+      }}
+    >
       {/* Header */}
       <View
         style={{
           paddingTop: insets.top,
-          backgroundColor: isDark ? "#1a1a1a" : "#fff",
+          backgroundColor: isDark ? colors.dark.card : colors.light.card,
           borderBottomWidth: 1,
-          borderBottomColor: isDark ? "#333" : "#e5e7eb",
+          borderBottomColor: isDark ? colors.dark.border : colors.light.border,
         }}
       >
         <View
@@ -142,14 +152,18 @@ export default function DiagnosesListScreen() {
             <Ionicons
               name="arrow-back"
               size={24}
-              color={isDark ? "#fff" : "#000"}
+              color={
+                isDark ? colors.dark.textPrimary : colors.light.textPrimary
+              }
             />
           </TouchableOpacity>
           <Text
             style={{
               fontSize: 18,
               fontWeight: "600",
-              color: isDark ? "#fff" : "#000",
+              color: isDark
+                ? colors.dark.textPrimary
+                : colors.light.textPrimary,
             }}
           >
             Diagnoses
@@ -161,13 +175,20 @@ export default function DiagnosesListScreen() {
       {/* Member Info */}
       <View
         style={{
-          backgroundColor: isDark ? "#1a1a1a" : "#fff",
+          backgroundColor: isDark ? colors.dark.card : colors.light.card,
           padding: 16,
           borderBottomWidth: 1,
-          borderBottomColor: isDark ? "#333" : "#e5e7eb",
+          borderBottomColor: isDark ? colors.dark.border : colors.light.border,
         }}
       >
-        <Text style={{ fontSize: 14, color: isDark ? "#9ca3af" : "#6b7280" }}>
+        <Text
+          style={{
+            fontSize: 14,
+            color: isDark
+              ? colors.dark.textTertiary
+              : colors.light.textTertiary,
+          }}
+        >
           Viewing diagnoses for
         </Text>
         <Text
@@ -175,7 +196,7 @@ export default function DiagnosesListScreen() {
             fontSize: 18,
             fontWeight: "600",
             marginTop: 4,
-            color: isDark ? "#fff" : "#000",
+            color: isDark ? colors.dark.textPrimary : colors.light.textPrimary,
           }}
         >
           {activeMember?.label}
@@ -194,14 +215,18 @@ export default function DiagnosesListScreen() {
           <Ionicons
             name="medical-outline"
             size={64}
-            color={isDark ? "#4b5563" : "#9ca3af"}
+            color={
+              isDark ? colors.dark.textTertiary : colors.light.textTertiary
+            }
           />
           <Text
             style={{
               fontSize: 18,
               fontWeight: "600",
               marginTop: 16,
-              color: isDark ? "#d1d5db" : "#374151",
+              color: isDark
+                ? colors.dark.textSecondary
+                : colors.light.textSecondary,
             }}
           >
             No diagnoses yet
@@ -209,7 +234,9 @@ export default function DiagnosesListScreen() {
           <Text
             style={{
               fontSize: 14,
-              color: isDark ? "#9ca3af" : "#6b7280",
+              color: isDark
+                ? colors.dark.textTertiary
+                : colors.light.textTertiary,
               marginTop: 8,
               textAlign: "center",
             }}
@@ -225,15 +252,12 @@ export default function DiagnosesListScreen() {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={{
-                backgroundColor: isDark ? "#1a1a1a" : "#fff",
+                backgroundColor: isDark ? colors.dark.card : colors.light.card,
                 borderRadius: 12,
                 padding: 16,
                 marginBottom: 12,
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.1,
-                shadowRadius: 2,
-                elevation: 2,
+                borderWidth: 1,
+                borderColor: isDark ? colors.dark.border : colors.light.border,
               }}
               onPress={() => router.push(`/diagnosis-detail?id=${item.id}`)}
               onLongPress={() => handleDelete(item.id, item.title)}
@@ -251,7 +275,9 @@ export default function DiagnosesListScreen() {
                     fontSize: 18,
                     fontWeight: "600",
                     flex: 1,
-                    color: isDark ? "#fff" : "#000",
+                    color: isDark
+                      ? colors.dark.textPrimary
+                      : colors.light.textPrimary,
                   }}
                 >
                   {item.title}
@@ -287,12 +313,18 @@ export default function DiagnosesListScreen() {
                   <Ionicons
                     name="warning-outline"
                     size={14}
-                    color={isDark ? "#9ca3af" : "#6b7280"}
+                    color={
+                      isDark
+                        ? colors.dark.textTertiary
+                        : colors.light.textTertiary
+                    }
                   />
                   <Text
                     style={{
                       fontSize: 14,
-                      color: isDark ? "#9ca3af" : "#6b7280",
+                      color: isDark
+                        ? colors.dark.textSecondary
+                        : colors.light.textSecondary,
                       marginLeft: 4,
                     }}
                   >
@@ -306,12 +338,18 @@ export default function DiagnosesListScreen() {
                   <Ionicons
                     name="calendar-outline"
                     size={14}
-                    color={isDark ? "#9ca3af" : "#6b7280"}
+                    color={
+                      isDark
+                        ? colors.dark.textTertiary
+                        : colors.light.textTertiary
+                    }
                   />
                   <Text
                     style={{
                       fontSize: 14,
-                      color: isDark ? "#9ca3af" : "#6b7280",
+                      color: isDark
+                        ? colors.dark.textSecondary
+                        : colors.light.textSecondary,
                       marginLeft: 4,
                     }}
                   >
@@ -324,7 +362,9 @@ export default function DiagnosesListScreen() {
                 <Text
                   style={{
                     fontSize: 14,
-                    color: isDark ? "#9ca3af" : "#6b7280",
+                    color: isDark
+                      ? colors.dark.textSecondary
+                      : colors.light.textSecondary,
                     marginTop: 8,
                   }}
                   numberOfLines={2}

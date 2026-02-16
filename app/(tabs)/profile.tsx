@@ -1,22 +1,24 @@
 import { useColorScheme } from "@/components/useColorScheme";
+import { colors } from "@/lib/colors";
 import { getProfile } from "@/lib/database";
 import { signOut } from "@/lib/googleAuth";
 import { useAuth } from "@/lib/useAuth";
-import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
+import { useRef } from "react";
+import BottomSheet from "@gorhom/bottom-sheet";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { EditProfileSheet } from "@/components/EditProfileSheet";
+import { updateProfile } from "@/lib/database";
 import {
   ActivityIndicator,
   Alert,
   Image,
-  Platform,
-  SafeAreaView,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -25,24 +27,12 @@ export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
-  const { width } = useWindowDimensions();
-
   const isDark = colorScheme === "dark";
-  const isWideScreen = width > 500; // tablet-ish layout threshold
 
   const [profile, setProfile] = useState<any>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
-
-  const colors = {
-    background: isDark ? "#0f0f0f" : "#f8fafc",
-    card: isDark ? "#1e293b" : "#ffffff",
-    text: isDark ? "#f1f5f9" : "#0f172a",
-    textSecondary: isDark ? "#94a3b8" : "#64748b",
-    border: isDark ? "#334155" : "#e2e8f0",
-    primary: "#0891b2",
-    primarySoft: isDark ? "#164e63" : "#e0f2fe",
-    danger: "#ef4444",
-  };
+  const editSheetRef = useRef<BottomSheet>(null);
+  const [editingField, setEditingField] = useState({ field: "", value: "" });
 
   useEffect(() => {
     if (session?.user?.id) {
@@ -62,11 +52,52 @@ export default function ProfileScreen() {
     setLoadingProfile(false);
   };
 
-  const handleSignOut = async () => {
-    const { error } = await signOut();
+  const handleEdit = (field: string, currentValue: string) => {
+    setEditingField({ field, value: currentValue || "" });
+    editSheetRef.current?.expand();
+  };
+
+  const handleSaveField = async (newValue: string) => {
+    if (!session?.user?.id) return;
+
+    const fieldMap: Record<string, string> = {
+      "Phone Number": "phone",
+      "Date of Birth": "dob",
+      Gender: "gender",
+      "Blood Group": "blood_group",
+    };
+
+    const dbField = fieldMap[editingField.field];
+    if (!dbField) return;
+
+    const { error } = await updateProfile(session.user.id, {
+      [dbField]: newValue,
+    });
+
     if (error) {
-      Alert.alert("Sign Out Failed", error.message || "Something went wrong");
+      Alert.alert("Error", "Failed to update profile");
+    } else {
+      // Reload profile
+      loadProfile();
     }
+  };
+  const handleSignOut = async () => {
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Sign Out",
+        style: "destructive",
+        onPress: async () => {
+          const { error } = await signOut();
+          if (error) {
+            Alert.alert(
+              "Sign Out Failed",
+              error.message || "Something went wrong",
+            );
+          }
+        },
+      },
+    ]);
   };
 
   useEffect(() => {
@@ -77,8 +108,10 @@ export default function ProfileScreen() {
 
   if (authLoading || loadingProfile) {
     return (
-      <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View
+        className={`flex-1 justify-center items-center ${isDark ? "bg-slate-950" : "bg-slate-50"}`}
+      >
+        <ActivityIndicator size="large" color={colors.light.primary} />
       </View>
     );
   }
@@ -87,259 +120,292 @@ export default function ProfileScreen() {
     profile?.avatar_url ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(
       profile?.full_name || "User",
-    )}&background=0891b2&color=fff&size=256`;
+    )}&background=0F766E&color=fff&size=256`;
 
-  const shortName = (profile?.full_name?.split(" ")[0] || "User").trim();
+  const appOptions = [
+    { id: "about", label: "About", icon: "information-circle-outline" },
+    { id: "terms", label: "Terms & Conditions", icon: "document-text-outline" },
+    {
+      id: "privacy",
+      label: "Privacy Policy",
+      icon: "shield-checkmark-outline",
+    },
+    { id: "contact", label: "Contact Us", icon: "mail-outline" },
+  ];
 
-  const personalFields = [
-    { label: "Full Name", value: profile?.full_name || "—", editable: false },
-    { label: "Email", value: profile?.email || "—", editable: false },
-    { label: "Phone Number", value: profile?.phone || "—", editable: true },
-    { label: "Date of Birth", value: profile?.dob || "—", editable: true },
-    { label: "Gender", value: profile?.gender || "—", editable: true },
+  const accountFields = [
+    {
+      label: "Full Name",
+      value: profile?.full_name,
+      icon: "person-outline",
+      editable: false,
+    },
+    {
+      label: "Email",
+      value: profile?.email,
+      icon: "mail-outline",
+      editable: false,
+    },
+    {
+      label: "Phone Number",
+      value: profile?.phone,
+      icon: "call-outline",
+      editable: true,
+    },
+    {
+      label: "Date of Birth",
+      value: profile?.dob,
+      icon: "calendar-outline",
+      editable: true,
+    },
+    {
+      label: "Gender",
+      value: profile?.gender,
+      icon: "transgender-outline",
+      editable: true,
+    },
     {
       label: "Blood Group",
-      value: profile?.blood_group || "—",
+      value: profile?.blood_group,
+      icon: "water-outline",
       editable: true,
     },
   ];
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-    >
-      {/* Header */}
-      <View
-        style={[
-          styles.header,
-          {
-            paddingTop: insets.top,
-            backgroundColor: colors.card,
-            borderBottomColor: colors.border,
-          },
-        ]}
-      >
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.iconButton}
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View className={`flex-1 ${isDark ? "bg-slate-950" : "bg-slate-50"}`}>
+        {/* Header with distinct background */}
+        <View
+          style={{ paddingTop: insets.top }}
+          className={
+            isDark
+              ? "bg-slate-900 border-b border-slate-800"
+              : "bg-white border-b border-slate-200"
+          }
         >
-          <Feather name="arrow-left" size={24} color={colors.text} />
-        </TouchableOpacity>
+          <View className="px-4 py-3 flex-row items-center justify-between">
+            <TouchableOpacity
+              onPress={() => router.back()}
+              className="w-10 h-10 -ml-2 items-center justify-center"
+            >
+              <Ionicons
+                name="arrow-back"
+                size={24}
+                color={
+                  isDark ? colors.dark.textPrimary : colors.light.textPrimary
+                }
+              />
+            </TouchableOpacity>
 
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          Profile
-        </Text>
+            <Text
+              className={`text-xl font-bold ${isDark ? "text-slate-100" : "text-slate-900"}`}
+            >
+              Profile
+            </Text>
 
-        <View style={{ width: 44 }} />
-      </View>
-
-      <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          isWideScreen && { maxWidth: 600, alignSelf: "center", width: "100%" },
-        ]}
-      >
-        {/* Avatar + Name */}
-        <View style={styles.avatarSection}>
-          <View style={[styles.avatarWrapper, { borderColor: colors.primary }]}>
-            <Image source={{ uri: avatarUri }} style={styles.avatar} />
+            <View className="w-10" />
           </View>
-          <Text style={[styles.shortName, { color: colors.text }]}>
-            {shortName}
-          </Text>
-          <Text style={[styles.emailHint, { color: colors.textSecondary }]}>
-            {profile?.email || "No email connected"}
-          </Text>
         </View>
 
-        {/* Profile Card */}
-        <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
-          {personalFields.map((item, index) => (
-            <View
-              key={item.label}
-              style={[
-                styles.fieldRow,
-                index === personalFields.length - 1 && { borderBottomWidth: 0 },
-                { borderBottomColor: colors.border },
-              ]}
-            >
-              <View style={styles.fieldLeft}>
+        <ScrollView className="flex-1" contentContainerClassName="pb-8">
+          {/* Profile Card */}
+          <View
+            className={`mx-4 mt-4 mb-6 rounded-2xl p-5 border ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}
+          >
+            <View className="flex-row items-center">
+              <View
+                className="w-16 h-16 rounded-full overflow-hidden"
+                style={{ backgroundColor: colors.light.primary + "20" }}
+              >
+                <Image source={{ uri: avatarUri }} className="w-full h-full" />
+              </View>
+              <View className="ml-4 flex-1">
                 <Text
-                  style={[styles.fieldLabel, { color: colors.textSecondary }]}
+                  className={`text-lg font-bold ${isDark ? "text-slate-100" : "text-slate-900"}`}
                 >
-                  {item.label}
+                  {profile?.full_name || "User"}
                 </Text>
-                <Text style={[styles.fieldValue, { color: colors.text }]}>
-                  {item.value}
+                <Text
+                  className={`text-sm mt-0.5 ${isDark ? "text-slate-400" : "text-slate-600"}`}
+                >
+                  {profile?.email || "No email"}
                 </Text>
               </View>
-
-              {item.editable ? (
-                <TouchableOpacity
-                  style={styles.editButton}
-                  onPress={() =>
-                    Alert.alert(
-                      "Edit",
-                      `Edit ${item.label.toLowerCase()} – coming soon`,
-                    )
-                  }
-                >
-                  <Feather name="edit-2" size={20} color={colors.primary} />
-                </TouchableOpacity>
-              ) : (
-                <View style={{ width: 44 }} />
-              )}
             </View>
-          ))}
-        </View>
+          </View>
 
-        {/* Actions */}
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            style={[
-              styles.signOutButton,
-              {
-                borderColor: colors.danger,
-                backgroundColor: colors.card,
-              },
-            ]}
-            onPress={handleSignOut}
-            activeOpacity={0.8}
-          >
-            <Feather
-              name="log-out"
-              size={18}
-              color={colors.danger}
-              style={{ marginRight: 8 }}
-            />
-            <Text style={[styles.signOutText, { color: colors.danger }]}>
-              Sign Out
+          {/* Account Section */}
+          <View className="px-4 mb-6">
+            <Text
+              className={`text-xs font-semibold uppercase tracking-wide mb-3 px-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+            >
+              ACCOUNT
             </Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+
+            <View
+              className={`rounded-2xl overflow-hidden border ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}
+            >
+              {accountFields.map((item, index, arr) => (
+                <View
+                  key={item.label}
+                  className={`px-4 py-3.5 flex-row items-center ${index !== arr.length - 1 ? `border-b ${isDark ? "border-slate-800" : "border-slate-200"}` : ""}`}
+                >
+                  <View
+                    className="w-10 h-10 rounded-xl items-center justify-center mr-3"
+                    style={{ backgroundColor: colors.light.primary + "15" }}
+                  >
+                    <Ionicons
+                      name={item.icon as any}
+                      size={20}
+                      color={colors.light.primary}
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <Text
+                      className={`text-xs mb-0.5 ${isDark ? "text-slate-500" : "text-slate-500"}`}
+                    >
+                      {item.label}
+                    </Text>
+                    <Text
+                      className={`text-base font-medium ${isDark ? "text-slate-100" : "text-slate-900"}`}
+                    >
+                      {item.value || "—"}
+                    </Text>
+                  </View>
+                  {item.editable && (
+                    <TouchableOpacity
+                      onPress={() => handleEdit(item.label, item.value || "")}
+                      className="ml-2"
+                    >
+                      <View
+                        className="w-8 h-8 rounded-lg items-center justify-center"
+                        style={{ backgroundColor: colors.light.primary + "15" }}
+                      >
+                        <Ionicons
+                          name="create-outline"
+                          size={16}
+                          color={colors.light.primary}
+                        />
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* App Section */}
+          <View className="px-4 mb-6">
+            <Text
+              className={`text-xs font-semibold uppercase tracking-wide mb-3 px-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+            >
+              APP
+            </Text>
+
+            <View
+              className={`rounded-2xl overflow-hidden border ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}
+            >
+              {appOptions.map((option, index) => (
+                <TouchableOpacity
+                  key={option.id}
+                  className={`px-4 py-3.5 flex-row items-center justify-between ${index !== appOptions.length - 1 ? `border-b ${isDark ? "border-slate-800" : "border-slate-200"}` : ""}`}
+                  onPress={() => Alert.alert(option.label, "Coming soon")}
+                >
+                  <View className="flex-row items-center flex-1">
+                    <View
+                      className="w-10 h-10 rounded-xl items-center justify-center mr-3"
+                      style={{ backgroundColor: colors.light.primary + "15" }}
+                    >
+                      <Ionicons
+                        name={option.icon as any}
+                        size={20}
+                        color={colors.light.primary}
+                      />
+                    </View>
+                    <Text
+                      className={`text-base font-medium ${isDark ? "text-slate-100" : "text-slate-900"}`}
+                    >
+                      {option.label}
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={20}
+                    color={
+                      isDark
+                        ? colors.dark.textTertiary
+                        : colors.light.textTertiary
+                    }
+                  />
+                </TouchableOpacity>
+              ))}
+
+              {/* App Version */}
+              <View
+                className={`px-4 py-3.5 flex-row items-center justify-between border-t ${isDark ? "border-slate-800" : "border-slate-200"}`}
+              >
+                <View className="flex-row items-center flex-1">
+                  <View
+                    className="w-10 h-10 rounded-xl items-center justify-center mr-3"
+                    style={{ backgroundColor: colors.light.primary + "15" }}
+                  >
+                    <Ionicons
+                      name="code-outline"
+                      size={20}
+                      color={colors.light.primary}
+                    />
+                  </View>
+                  <Text
+                    className={`text-base font-medium ${isDark ? "text-slate-100" : "text-slate-900"}`}
+                  >
+                    App Version
+                  </Text>
+                </View>
+                <Text
+                  className={`text-sm font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}
+                >
+                  1.0.0
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Sign Out Button */}
+          <View className="px-4">
+            <TouchableOpacity
+              className="rounded-2xl py-4 items-center border-2"
+              style={{
+                borderColor: colors.light.error,
+                backgroundColor: isDark ? colors.dark.card : colors.light.card,
+              }}
+              onPress={handleSignOut}
+            >
+              <View className="flex-row items-center">
+                <Ionicons
+                  name="log-out-outline"
+                  size={20}
+                  color={colors.light.error}
+                  style={{ marginRight: 8 }}
+                />
+                <Text
+                  className="text-base font-semibold"
+                  style={{ color: colors.light.error }}
+                >
+                  Sign Out
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </View>
+      {/* Edit Profile Bottom Sheet */}
+      <EditProfileSheet
+        ref={editSheetRef}
+        field={editingField.field}
+        currentValue={editingField.value}
+        onSave={handleSaveField}
+      />
+    </GestureHandlerRootView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    letterSpacing: -0.3,
-  },
-  iconButton: {
-    padding: 8,
-    margin: -8,
-  },
-
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 60,
-  },
-
-  avatarSection: {
-    alignItems: "center",
-    marginBottom: 32,
-  },
-  avatarWrapper: {
-    padding: 4,
-    borderWidth: 3,
-    borderRadius: 999,
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 999,
-  },
-  shortName: {
-    fontSize: 26,
-    fontWeight: "700",
-    marginBottom: 4,
-  },
-  emailHint: {
-    fontSize: 15,
-    fontWeight: "500",
-  },
-
-  sectionCard: {
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    marginBottom: 32,
-    borderWidth: Platform.select({ ios: 0, android: 1 }),
-    borderColor: "#e2e8f0",
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
-      },
-      android: { elevation: 4 },
-    }),
-  },
-  fieldRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-  },
-  fieldLeft: {
-    flex: 1,
-  },
-  fieldLabel: {
-    fontSize: 12.5,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-    marginBottom: 4,
-  },
-  fieldValue: {
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  editButton: {
-    padding: 12,
-    margin: -12,
-  },
-
-  actionsContainer: {
-    alignItems: "center",
-  },
-  signOutButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    borderWidth: 2,
-    borderRadius: 16,
-    minWidth: 220,
-  },
-  signOutText: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-});

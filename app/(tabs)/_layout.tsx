@@ -10,6 +10,7 @@ import { useClientOnlyValue } from "@/components/useClientOnlyValue";
 import { useColorScheme } from "@/components/useColorScheme";
 import Colors from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
+import { colors } from "@/lib/colors";
 
 function TabBarIcon(props: {
   name: React.ComponentProps<typeof FontAwesome>["name"];
@@ -48,13 +49,16 @@ export default function TabLayout() {
         <Tabs.Screen
           name="documents"
           options={{
-            title: "documents",
-            tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color} />,
-            header: () => (
-              <CustomHeader
-                onProfilePress={() => bottomSheetRef.current?.expand()}
-              />
+            title: "Documents",
+            tabBarIcon: ({ color }) => (
+              <Ionicons name="document-text" size={24} color={color} />
             ),
+          }}
+          listeners={{
+            tabPress: (e) => {
+              e.preventDefault();
+              router.push("/documents-list");
+            },
           }}
         />
 
@@ -106,6 +110,7 @@ export default function TabLayout() {
           name="profile"
           options={{
             title: "Profile",
+            headerShown: false,
             tabBarIcon: ({ color }) => <TabBarIcon name="user" color={color} />,
           }}
         />
@@ -119,11 +124,17 @@ export default function TabLayout() {
           visible={showAddModal}
           onClose={() => setShowAddModal(false)}
           onSelect={(type) => {
+            console.log("Selected type:", type);
             setShowAddModal(false);
             if (type === "diagnosis") {
               router.push("/create-diagnosis");
+            } else if (type === "visit") {
+              router.push("/create-visit");
+            } else if (type === "test") {
+              router.push("/create-test");
+            } else if (type === "document") {
+              router.push("/create-document");
             }
-            // Others coming soon
           }}
         />
       )}
@@ -131,6 +142,7 @@ export default function TabLayout() {
   );
 }
 
+// Add Content Type Selector Component
 // Add Content Type Selector Component
 function AddContentModal({
   visible,
@@ -150,6 +162,7 @@ function AddContentModal({
     { id: "visit", icon: "business", label: "Visit", emoji: "🏥" },
     { id: "document", icon: "document-text", label: "Document", emoji: "📄" },
   ];
+
   return (
     <TouchableOpacity
       style={{
@@ -167,7 +180,7 @@ function AddContentModal({
     >
       <View
         style={{
-          backgroundColor: isDark ? "#1a1a1a" : "#fff",
+          backgroundColor: isDark ? colors.dark.card : colors.light.card,
           borderTopLeftRadius: 20,
           borderTopRightRadius: 20,
           padding: 20,
@@ -179,7 +192,7 @@ function AddContentModal({
             fontSize: 20,
             fontWeight: "600",
             marginBottom: 20,
-            color: isDark ? "#fff" : "#000",
+            color: isDark ? colors.dark.textPrimary : colors.light.textPrimary,
           }}
         >
           What would you like to add?
@@ -192,9 +205,13 @@ function AddContentModal({
               flexDirection: "row",
               alignItems: "center",
               padding: 16,
-              backgroundColor: isDark ? "#2a2a2a" : "#f3f4f6",
+              backgroundColor: isDark
+                ? colors.dark.background
+                : colors.light.background,
               borderRadius: 12,
               marginBottom: 12,
+              borderWidth: 1,
+              borderColor: isDark ? colors.dark.border : colors.light.border,
             }}
             onPress={() => onSelect(option.id)}
           >
@@ -205,7 +222,9 @@ function AddContentModal({
               style={{
                 fontSize: 16,
                 fontWeight: "500",
-                color: isDark ? "#fff" : "#000",
+                color: isDark
+                  ? colors.dark.textPrimary
+                  : colors.light.textPrimary,
               }}
             >
               {option.label}

@@ -1,9 +1,12 @@
 import { useColorScheme } from "@/components/useColorScheme";
+import { colors } from "@/lib/colors";
 import AntDesign from "@expo/vector-icons/AntDesign";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ProfileSwitcher } from "./ProfileSwitcher";
+
 interface CustomHeaderProps {
   onProfilePress: () => void;
 }
@@ -18,48 +21,44 @@ export function CustomHeader({ onProfilePress }: CustomHeaderProps) {
     <View
       style={{
         paddingTop: insets.top,
-        backgroundColor: isDark ? "#1a1a1a" : "#ffffff",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: isDark ? 0.3 : 0.05,
-        shadowRadius: 2,
-        elevation: 2,
+        backgroundColor: isDark
+          ? colors.dark.background
+          : colors.light.background,
       }}
     >
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          paddingHorizontal: 16,
-          paddingVertical: 10,
-          height: 56,
-        }}
-      >
-        <ProfileSwitcher onPress={onProfilePress} />
+      {/* Header Content */}
+      <View className="px-4 py-4">
+        <View className="flex-row items-center justify-between mb-3">
+          {/* Logo/Brand */}
+          <View className="flex-row items-center gap-2">
+            <View
+              className="w-9 h-9 rounded-xl items-center justify-center"
+              style={{ backgroundColor: colors.light.primary }}
+            >
+              <Ionicons name="medical" size={20} color="#fff" />
+            </View>
+            <Text
+              className={`text-xl font-bold ${isDark ? "text-slate-100" : "text-slate-900"}`}
+            >
+              MedRecord
+            </Text>
+          </View>
 
-        <TouchableOpacity
-          onPress={() => router.push("/add-family-member")}
-          style={{
-            width: 36,
-            height: 36,
-            backgroundColor: "#0891b2",
-            borderRadius: 18,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Text
+          {/* Add Member Button */}
+          <TouchableOpacity
+            onPress={() => router.push("/add-family-member")}
+            className="w-10 h-10 rounded-xl items-center justify-center border"
             style={{
-              color: "white",
-              fontSize: 20,
-              fontWeight: "600",
-              marginTop: -2,
+              backgroundColor: isDark ? colors.dark.card : colors.light.card,
+              borderColor: isDark ? colors.dark.border : colors.light.border,
             }}
           >
-            <AntDesign name="user-add" size={18} color="white" />
-          </Text>
-        </TouchableOpacity>
+            <AntDesign name="user-add" size={18} color={colors.light.primary} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Profile Switcher */}
+        <ProfileSwitcher onPress={onProfilePress} />
       </View>
     </View>
   );

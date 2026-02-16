@@ -1,4 +1,5 @@
 import { useColorScheme } from "@/components/useColorScheme";
+import { useActiveMember } from "@/contexts/ActiveMemberContext";
 import { createFamilyMember } from "@/lib/database";
 import { useAuth } from "@/lib/useAuth";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,7 +15,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -35,6 +36,7 @@ const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 export default function AddFamilyMemberScreen() {
   const { session } = useAuth();
+  const { setActiveMember } = useActiveMember();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
@@ -98,11 +100,16 @@ export default function AddFamilyMemberScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!session?.user?.id || !isFormValid) return;
+    if (!session?.user?.id) return;
+
+    if (!formData.full_name.trim()) {
+      Alert.alert("Error", "Please enter full name");
+      return;
+    }
 
     setLoading(true);
 
-    const { error } = await createFamilyMember({
+    const { data, error } = await createFamilyMember({
       user_id: session.user.id,
       full_name: formData.full_name.trim(),
       relation: formData.relation || undefined,
@@ -117,7 +124,17 @@ export default function AddFamilyMemberScreen() {
       Alert.alert("Error", "Failed to add family member");
       console.error(error);
     } else {
-      Alert.alert("Success", "Family member added");
+      Alert.alert("Success", "Family member added successfully");
+
+      // Auto-switch to the newly created member
+      if (data) {
+        setActiveMember({
+          id: data.id,
+          type: "family",
+          label: data.full_name,
+        });
+      }
+
       router.back();
     }
   };

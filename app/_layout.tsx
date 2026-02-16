@@ -1,3 +1,4 @@
+import "../global.css";
 import { useColorScheme } from "@/components/useColorScheme";
 import { ActiveMemberProvider } from "@/contexts/ActiveMemberContext";
 import { configureGoogleSignIn } from "@/lib/googleAuth";
@@ -16,11 +17,10 @@ import { ActivityIndicator, StatusBar, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import "../global.css";
 
 export {
   // Catch any errors thrown by the Layout component.
-  ErrorBoundary
+  ErrorBoundary,
 } from "expo-router";
 
 export const unstable_settings = {
@@ -113,6 +113,7 @@ function RootLayoutNav() {
                   name="add-family-member"
                   options={{ title: "Add Member" }}
                 />
+                <Stack.Screen name="create-visit" />
               </Stack>
             </ThemeProvider>
           </ActiveMemberProvider>

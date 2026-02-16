@@ -7,6 +7,12 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { getDiagnoses } from "@/lib/database";
+import { colors } from "@/lib/colors";
+import { getVisits } from "@/lib/database";
+import { getTests } from "@/lib/database";
+import { getDocuments } from "@/lib/database";
+import { Image } from "react-native";
 
 export default function HomeScreen() {
   const { activeMember } = useActiveMember();
@@ -17,9 +23,118 @@ export default function HomeScreen() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showFamilySection, setShowFamilySection] = useState(true);
   const [hasFamilyMembers, setHasFamilyMembers] = useState(false);
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
 
   // TODO: Check if user has any content - for now showing empty state
-  const hasContent = false;
+  const [hasContent, setHasContent] = useState(false);
+  const [diagnosesCount, setDiagnosesCount] = useState(0);
+  const [visitsCount, setVisitsCount] = useState(0);
+  const [testsCount, setTestsCount] = useState(0);
+  const [documentsCount, setDocumentsCount] = useState(0);
+
+  const checkContent = async () => {
+    if (!activeMember?.id) return;
+
+    // Check diagnoses
+    const { data: diagnosesData } = await getDiagnoses(activeMember.id);
+    const diagnosesCount = diagnosesData?.length || 0;
+    setDiagnosesCount(diagnosesCount);
+
+    // Check visits
+    const { data: visitsData } = await getVisits(activeMember.id);
+    const visitsCountTotal = visitsData?.length || 0;
+    setVisitsCount(visitsCountTotal);
+
+    // Check tests
+    const { data: testsData } = await getTests(activeMember.id);
+    const testsCountTotal = testsData?.length || 0;
+    setTestsCount(testsCountTotal);
+
+    // Check documents
+    const { data: documentsData } = await getDocuments(activeMember.id);
+    const documentsCountTotal = documentsData?.length || 0;
+    setDocumentsCount(documentsCountTotal);
+
+    // Combine all recent activity
+    const activities: any[] = [];
+
+    // Add diagnoses
+    diagnosesData?.forEach((item) => {
+      activities.push({
+        id: item.id,
+        type: "diagnosis",
+        title: item.title,
+        date: item.diagnosed_on || item.created_at,
+        status: item.status,
+        icon: "pulse",
+        color: "#f59e0b",
+        route: `/diagnosis-detail?id=${item.id}`,
+      });
+    });
+
+    // Add visits
+    visitsData?.forEach((item) => {
+      activities.push({
+        id: item.id,
+        type: "visit",
+        title: item.reason,
+        date: item.visit_date,
+        status: item.status,
+        icon: "medical",
+        color: "#14b8a6",
+        route: `/visit-detail?id=${item.id}`,
+      });
+    });
+
+    // Add tests
+    testsData?.forEach((item) => {
+      activities.push({
+        id: item.id,
+        type: "test",
+        title: item.test_name,
+        date: item.test_date,
+        status: item.status,
+        icon: "flask",
+        color: "#8b5cf6",
+        route: `/test-detail?id=${item.id}`,
+      });
+    });
+
+    // Add documents
+    documentsData?.forEach((item) => {
+      activities.push({
+        id: item.id,
+        type: "document",
+        title: item.title,
+        date: item.document_date,
+        status: item.document_type,
+        fileType: item.file_type, // Add this line
+        icon: "document-text",
+        color: "#22c55e",
+        route: `/document-detail?id=${item.id}`,
+      });
+    });
+
+    // Sort by date (most recent first) and take top 5
+    const sortedActivities = activities
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 5);
+
+    setRecentActivity(sortedActivities);
+
+    // Check if user has any content
+    setHasContent(
+      diagnosesCount > 0 ||
+        visitsCountTotal > 0 ||
+        testsCountTotal > 0 ||
+        documentsCountTotal > 0,
+    );
+  };
+  useFocusEffect(
+    useCallback(() => {
+      checkContent();
+    }, [activeMember]),
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -316,9 +431,16 @@ export default function HomeScreen() {
             visible={showAddModal}
             onClose={() => setShowAddModal(false)}
             onSelect={(type) => {
+              console.log("Selected type:", type);
               setShowAddModal(false);
               if (type === "diagnosis") {
                 router.push("/create-diagnosis");
+              } else if (type === "visit") {
+                router.push("/create-visit");
+              } else if (type === "test") {
+                router.push("/create-test");
+              } else if (type === "document") {
+                router.push("/create-document");
               }
             }}
           />
@@ -328,27 +450,639 @@ export default function HomeScreen() {
   }
 
   // TODO: Implement content state (Quick Summary, Recent Activity, Medical Records)
+  // Content State - User has added data
   return (
-    <View
+    <ScrollView
       style={{
         flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 20,
+        backgroundColor: isDark
+          ? colors.dark.background
+          : colors.light.background,
       }}
     >
-      <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
-        Welcome!
-      </Text>
-      {activeMember && (
-        <Text style={{ fontSize: 16, opacity: 0.7 }}>
-          Viewing records for: {activeMember.label}
+      {/* Quick Summary */}
+      {/* Quick Summary */}
+      <View className="p-4">
+        <Text
+          className={`text-xs font-semibold uppercase tracking-wide mb-3 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+        >
+          QUICK SUMMARY
         </Text>
-      )}
-    </View>
+
+        <View className="flex-row flex-wrap gap-3">
+          {/* Last Test */}
+          {/* Last Test */}
+          <TouchableOpacity
+            className={`rounded-xl p-4 border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}
+            style={{ width: "48%" }}
+            onPress={() => testsCount > 0 && router.push("/tests-list")}
+            disabled={testsCount === 0}
+          >
+            <View className="w-10 h-10 rounded-full bg-purple-500/20 items-center justify-center mb-3">
+              <Ionicons name="flask" size={20} color="#8b5cf6" />
+            </View>
+            <Text
+              className={`text-xs mb-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+            >
+              {testsCount > 0 ? "Total Tests" : "Tests"}
+            </Text>
+            {testsCount > 0 ? (
+              <View className="flex-row items-center gap-1">
+                <Text
+                  className={`text-xl font-semibold ${isDark ? "text-slate-200" : "text-slate-900"}`}
+                >
+                  {testsCount}
+                </Text>
+                <Text
+                  className="text-xs font-medium"
+                  style={{ color: colors.light.primary }}
+                >
+                  View details
+                </Text>
+              </View>
+            ) : (
+              <Text
+                className={`text-sm font-semibold ${isDark ? "text-slate-200" : "text-slate-900"}`}
+              >
+                No tests yet
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Visits */}
+          <TouchableOpacity
+            className={`rounded-xl p-4 border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}
+            style={{ width: "48%" }}
+            onPress={() => visitsCount > 0 && router.push("/visits-list")}
+            disabled={visitsCount === 0}
+          >
+            <View
+              className="w-10 h-10 rounded-full items-center justify-center mb-3"
+              style={{ backgroundColor: colors.light.primaryLight + "20" }}
+            >
+              <Ionicons
+                name="medical"
+                size={20}
+                color={colors.light.primaryLight}
+              />
+            </View>
+            <Text
+              className={`text-xs mb-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+            >
+              {visitsCount > 0 ? "Total Visits" : "Visits"}
+            </Text>
+            {visitsCount > 0 ? (
+              <View className="flex-row items-center gap-1">
+                <Text
+                  className={`text-xl font-semibold ${isDark ? "text-slate-200" : "text-slate-900"}`}
+                >
+                  {visitsCount}
+                </Text>
+                <Text
+                  className="text-xs font-medium"
+                  style={{ color: colors.light.primary }}
+                >
+                  View details
+                </Text>
+              </View>
+            ) : (
+              <Text
+                className={`text-sm font-semibold ${isDark ? "text-slate-200" : "text-slate-900"}`}
+              >
+                No visits yet
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Diagnoses */}
+          <TouchableOpacity
+            className={`rounded-xl p-4 border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}
+            style={{ width: "48%" }}
+            onPress={() => diagnosesCount > 0 && router.push("/diagnoses-list")}
+            disabled={diagnosesCount === 0}
+          >
+            <View
+              className="w-10 h-10 rounded-full items-center justify-center mb-3"
+              style={{ backgroundColor: colors.light.warning + "20" }}
+            >
+              <Ionicons name="pulse" size={20} color={colors.light.warning} />
+            </View>
+            <Text
+              className={`text-xs mb-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+            >
+              {diagnosesCount > 0 ? "Diagnoses" : "Active Diagnoses"}
+            </Text>
+            {diagnosesCount > 0 ? (
+              <View className="flex-row items-center gap-1">
+                <Text
+                  className={`text-xl font-semibold ${isDark ? "text-slate-200" : "text-slate-900"}`}
+                >
+                  {diagnosesCount}
+                </Text>
+                <Text
+                  className="text-xs font-medium"
+                  style={{ color: colors.light.primary }}
+                >
+                  View details
+                </Text>
+              </View>
+            ) : (
+              <Text
+                className={`text-sm font-semibold ${isDark ? "text-slate-200" : "text-slate-900"}`}
+              >
+                No diagnoses yet
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Documents */}
+          {/* Documents */}
+          <TouchableOpacity
+            className={`rounded-xl p-4 border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}
+            style={{ width: "48%" }}
+            onPress={() => documentsCount > 0 && router.push("/documents-list")}
+            disabled={documentsCount === 0}
+          >
+            <View
+              className="w-10 h-10 rounded-full items-center justify-center mb-3"
+              style={{ backgroundColor: colors.light.success + "20" }}
+            >
+              <Ionicons
+                name="document-text"
+                size={20}
+                color={colors.light.success}
+              />
+            </View>
+            <Text
+              className={`text-xs mb-1 ${isDark ? "text-slate-500" : "text-slate-600"}`}
+            >
+              {documentsCount > 0 ? "Documents" : "Documents"}
+            </Text>
+            {documentsCount > 0 ? (
+              <View className="flex-row items-center gap-1">
+                <Text
+                  className={`text-xl font-semibold ${isDark ? "text-slate-200" : "text-slate-900"}`}
+                >
+                  {documentsCount}
+                </Text>
+                <Text
+                  className="text-xs font-medium"
+                  style={{ color: colors.light.primary }}
+                >
+                  View details
+                </Text>
+              </View>
+            ) : (
+              <Text
+                className={`text-sm font-semibold ${isDark ? "text-slate-200" : "text-slate-900"}`}
+              >
+                No documents yet
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Recent Activity */}
+      <View style={{ padding: 16, paddingTop: 8 }}>
+        <Text
+          style={{
+            fontSize: 12,
+            fontWeight: "600",
+            color: isDark
+              ? colors.dark.textTertiary
+              : colors.light.textTertiary,
+            textTransform: "uppercase",
+            letterSpacing: 0.5,
+            marginBottom: 12,
+          }}
+        >
+          RECENT ACTIVITY
+        </Text>
+
+        {recentActivity.length === 0 ? (
+          <View
+            style={{
+              backgroundColor: isDark ? colors.dark.card : colors.light.card,
+              borderRadius: 12,
+              padding: 24,
+              borderWidth: 1,
+              borderColor: isDark ? colors.dark.border : colors.light.border,
+              alignItems: "center",
+            }}
+          >
+            <Ionicons
+              name="time-outline"
+              size={32}
+              color={
+                isDark ? colors.dark.textTertiary : colors.light.textTertiary
+              }
+            />
+            <Text
+              style={{
+                fontSize: 14,
+                color: isDark
+                  ? colors.dark.textSecondary
+                  : colors.light.textSecondary,
+                marginTop: 8,
+                textAlign: "center",
+              }}
+            >
+              Activity timeline will show here
+            </Text>
+          </View>
+        ) : (
+          <View style={{ gap: 12 }}>
+            {recentActivity.map((activity) => (
+              <TouchableOpacity
+                key={`${activity.type}-${activity.id}`}
+                style={{
+                  backgroundColor: isDark
+                    ? colors.dark.card
+                    : colors.light.card,
+                  borderRadius: 12,
+                  padding: 16,
+                  borderWidth: 1,
+                  borderColor: isDark
+                    ? colors.dark.border
+                    : colors.light.border,
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+                onPress={() => router.push(activity.route as any)}
+              >
+                {/* Thumbnail */}
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 8,
+                    overflow: "hidden",
+                    marginRight: 12,
+                  }}
+                >
+                  {activity.type === "document" ? (
+                    <Image
+                      source={
+                        activity.fileType === "pdf"
+                          ? require("@/assets/images/pdf.png")
+                          : require("@/assets/images/picture.png")
+                      }
+                      style={{ width: "100%", height: "100%" }}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        borderRadius: 8,
+                        backgroundColor: activity.color + "20",
+                        justifyContent: "center",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Ionicons
+                        name={activity.icon as any}
+                        size={20}
+                        color={activity.color}
+                      />
+                    </View>
+                  )}
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      marginBottom: 4,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: "600",
+                        color: activity.color,
+                        textTransform: "uppercase",
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      {activity.type}
+                    </Text>
+                  </View>
+                  <Text
+                    style={{
+                      fontSize: 15,
+                      fontWeight: "600",
+                      color: isDark
+                        ? colors.dark.textPrimary
+                        : colors.light.textPrimary,
+                      marginBottom: 4,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {activity.title}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: isDark
+                        ? colors.dark.textSecondary
+                        : colors.light.textSecondary,
+                    }}
+                  >
+                    {new Date(activity.date).toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </Text>
+                </View>
+
+                {activity.type !== "document" && (
+                  <View
+                    style={{
+                      backgroundColor:
+                        activity.status === "Active" ||
+                        activity.status === "upcoming"
+                          ? colors.light.primary + "20"
+                          : activity.status === "Resolved" ||
+                              activity.status === "completed"
+                            ? colors.light.success + "20"
+                            : activity.status === "normal"
+                              ? colors.light.success + "20"
+                              : activity.status === "abnormal"
+                                ? colors.light.error + "20"
+                                : colors.light.warning + "20",
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 6,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: "600",
+                        color:
+                          activity.status === "Active" ||
+                          activity.status === "upcoming"
+                            ? colors.light.primary
+                            : activity.status === "Resolved" ||
+                                activity.status === "completed"
+                              ? colors.light.success
+                              : activity.status === "normal"
+                                ? colors.light.success
+                                : activity.status === "abnormal"
+                                  ? colors.light.error
+                                  : colors.light.warning,
+                        textTransform: "capitalize",
+                      }}
+                    >
+                      {activity.status}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* Medical Records */}
+      {/* Medical Records */}
+      <View style={{ paddingTop: 8, paddingBottom: 32 }}>
+        <Text
+          style={{
+            fontSize: 12,
+            fontWeight: "600",
+            color: isDark
+              ? colors.dark.textTertiary
+              : colors.light.textTertiary,
+            textTransform: "uppercase",
+            letterSpacing: 0.5,
+            marginBottom: 12,
+            paddingHorizontal: 16,
+          }}
+        >
+          MEDICAL RECORDS
+        </Text>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
+        >
+          {/* Tests */}
+          <TouchableOpacity
+            style={{
+              backgroundColor: isDark ? colors.dark.card : colors.light.card,
+              borderRadius: 12,
+              padding: 16,
+              width: 160,
+              borderWidth: 1,
+              borderColor: isDark ? colors.dark.border : colors.light.border,
+            }}
+            onPress={() => router.push("/tests-list")}
+          >
+            <View
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                backgroundColor: "#8b5cf620",
+                justifyContent: "center",
+                alignItems: "center",
+                marginBottom: 12,
+              }}
+            >
+              <Ionicons name="flask" size={24} color="#8b5cf6" />
+            </View>
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: "600",
+                color: isDark
+                  ? colors.dark.textPrimary
+                  : colors.light.textPrimary,
+                marginBottom: 4,
+              }}
+            >
+              Tests
+            </Text>
+            <Text
+              style={{
+                fontSize: 14,
+                color: isDark
+                  ? colors.dark.textSecondary
+                  : colors.light.textSecondary,
+              }}
+            >
+              {testsCount} records
+            </Text>
+          </TouchableOpacity>
+
+          {/* Visits */}
+          <TouchableOpacity
+            style={{
+              backgroundColor: isDark ? colors.dark.card : colors.light.card,
+              borderRadius: 12,
+              padding: 16,
+              width: 160,
+              borderWidth: 1,
+              borderColor: isDark ? colors.dark.border : colors.light.border,
+            }}
+            onPress={() => router.push("/visits-list")}
+          >
+            <View
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                backgroundColor: colors.light.primaryLight + "20",
+                justifyContent: "center",
+                alignItems: "center",
+                marginBottom: 12,
+              }}
+            >
+              <Ionicons
+                name="medical"
+                size={24}
+                color={colors.light.primaryLight}
+              />
+            </View>
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: "600",
+                color: isDark
+                  ? colors.dark.textPrimary
+                  : colors.light.textPrimary,
+                marginBottom: 4,
+              }}
+            >
+              Visits
+            </Text>
+            <Text
+              style={{
+                fontSize: 14,
+                color: isDark
+                  ? colors.dark.textSecondary
+                  : colors.light.textSecondary,
+              }}
+            >
+              {visitsCount} records
+            </Text>
+          </TouchableOpacity>
+
+          {/* Diagnoses */}
+          <TouchableOpacity
+            style={{
+              backgroundColor: isDark ? colors.dark.card : colors.light.card,
+              borderRadius: 12,
+              padding: 16,
+              width: 160,
+              borderWidth: 1,
+              borderColor: isDark ? colors.dark.border : colors.light.border,
+            }}
+            onPress={() => router.push("/diagnoses-list")}
+          >
+            <View
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                backgroundColor: colors.light.warning + "20",
+                justifyContent: "center",
+                alignItems: "center",
+                marginBottom: 12,
+              }}
+            >
+              <Ionicons name="pulse" size={24} color={colors.light.warning} />
+            </View>
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: "600",
+                color: isDark
+                  ? colors.dark.textPrimary
+                  : colors.light.textPrimary,
+                marginBottom: 4,
+              }}
+            >
+              Diagnoses
+            </Text>
+            <Text
+              style={{
+                fontSize: 14,
+                color: isDark
+                  ? colors.dark.textSecondary
+                  : colors.light.textSecondary,
+              }}
+            >
+              {diagnosesCount} records
+            </Text>
+          </TouchableOpacity>
+
+          {/* Documents */}
+          <TouchableOpacity
+            style={{
+              backgroundColor: isDark ? colors.dark.card : colors.light.card,
+              borderRadius: 12,
+              padding: 16,
+              width: 160,
+              borderWidth: 1,
+              borderColor: isDark ? colors.dark.border : colors.light.border,
+            }}
+            onPress={() => router.push("/documents-list")}
+          >
+            <View
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                backgroundColor: colors.light.success + "20",
+                justifyContent: "center",
+                alignItems: "center",
+                marginBottom: 12,
+              }}
+            >
+              <Ionicons
+                name="document-text"
+                size={24}
+                color={colors.light.success}
+              />
+            </View>
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: "600",
+                color: isDark
+                  ? colors.dark.textPrimary
+                  : colors.light.textPrimary,
+                marginBottom: 4,
+              }}
+            >
+              Documents
+            </Text>
+            <Text
+              style={{
+                fontSize: 14,
+                color: isDark
+                  ? colors.dark.textSecondary
+                  : colors.light.textSecondary,
+              }}
+            >
+              {documentsCount} records
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    </ScrollView>
   );
 }
 
+// Add Content Type Selector Component
 // Add Content Type Selector Component
 function AddContentModal({
   visible,
@@ -386,7 +1120,7 @@ function AddContentModal({
     >
       <View
         style={{
-          backgroundColor: isDark ? "#1a1a1a" : "#fff",
+          backgroundColor: isDark ? colors.dark.card : colors.light.card,
           borderTopLeftRadius: 20,
           borderTopRightRadius: 20,
           padding: 20,
@@ -398,7 +1132,7 @@ function AddContentModal({
             fontSize: 20,
             fontWeight: "600",
             marginBottom: 20,
-            color: isDark ? "#fff" : "#000",
+            color: isDark ? colors.dark.textPrimary : colors.light.textPrimary,
           }}
         >
           What would you like to add?
@@ -411,9 +1145,13 @@ function AddContentModal({
               flexDirection: "row",
               alignItems: "center",
               padding: 16,
-              backgroundColor: isDark ? "#2a2a2a" : "#f3f4f6",
+              backgroundColor: isDark
+                ? colors.dark.background
+                : colors.light.background,
               borderRadius: 12,
               marginBottom: 12,
+              borderWidth: 1,
+              borderColor: isDark ? colors.dark.border : colors.light.border,
             }}
             onPress={() => onSelect(option.id)}
           >
@@ -424,7 +1162,9 @@ function AddContentModal({
               style={{
                 fontSize: 16,
                 fontWeight: "500",
-                color: isDark ? "#fff" : "#000",
+                color: isDark
+                  ? colors.dark.textPrimary
+                  : colors.light.textPrimary,
               }}
             >
               {option.label}
