@@ -4,8 +4,10 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
-  Alert,
   Platform,
+  KeyboardAvoidingView,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { useState } from "react";
 import { useRouter } from "expo-router";
@@ -24,7 +26,8 @@ const VISIT_TYPES = [
   "Routine Checkup",
   "Teleconsultation",
   "Other",
-];
+] as const;
+
 const COMMON_SPECIALTIES = [
   "General Medicine",
   "Cardiology",
@@ -36,7 +39,81 @@ const COMMON_SPECIALTIES = [
   "ENT",
   "Psychiatry",
   "Other",
-];
+] as const;
+
+// ─── Reusable pieces ──────────────────────────────────────────────────────────
+
+function SectionLabel({ label, isDark }: { label: string; isDark: boolean }) {
+  return (
+    <Text
+      className={`text-[11px] font-bold tracking-[1px] uppercase ml-1 mb-2.5 mt-1 ${
+        isDark ? "text-slate-500" : "text-slate-400"
+      }`}
+    >
+      {label}
+    </Text>
+  );
+}
+
+function FieldLabel({
+  label,
+  required,
+  isDark,
+}: {
+  label: string;
+  required?: boolean;
+  isDark: boolean;
+}) {
+  return (
+    <View className="flex-row items-center mb-2">
+      <Text
+        className={`text-[13px] font-medium ${
+          isDark ? "text-slate-400" : "text-slate-500"
+        }`}
+      >
+        {label}
+      </Text>
+      {required && (
+        <Text className="text-cyan-600 font-bold text-sm ml-0.5 leading-5">
+          *
+        </Text>
+      )}
+    </View>
+  );
+}
+
+function Divider({ isDark }: { isDark: boolean }) {
+  return (
+    <View className={`h-px mx-4 ${isDark ? "bg-slate-800" : "bg-slate-100"}`} />
+  );
+}
+
+function InputRow({
+  icon,
+  isDark,
+  children,
+}: {
+  icon: string;
+  isDark: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <View
+      className={`flex-row items-center rounded-xl border overflow-hidden ${
+        isDark
+          ? "bg-slate-800 border-slate-700"
+          : "bg-slate-50 border-slate-200"
+      }`}
+    >
+      <View className="w-11 h-12 items-center justify-center bg-cyan-500/10">
+        <Ionicons name={icon as any} size={18} color={colors.light.primary} />
+      </View>
+      {children}
+    </View>
+  );
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function CreateVisitScreen() {
   const router = useRouter();
@@ -44,6 +121,7 @@ export default function CreateVisitScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const insets = useSafeAreaInsets();
+
   const [loading, setLoading] = useState(false);
   const [showVisitDatePicker, setShowVisitDatePicker] = useState(false);
   const [showVisitTimePicker, setShowVisitTimePicker] = useState(false);
@@ -54,7 +132,7 @@ export default function CreateVisitScreen() {
   const [showCustomSpecialty, setShowCustomSpecialty] = useState(false);
 
   const [formData, setFormData] = useState({
-    status: "", // Will be set first
+    status: "",
     visit_date: "",
     visit_type: "",
     reason: "",
@@ -66,9 +144,7 @@ export default function CreateVisitScreen() {
   });
 
   const handleVisitDateChange = (event: any, date?: Date) => {
-    if (Platform.OS === "android") {
-      setShowVisitDatePicker(false);
-    }
+    if (Platform.OS === "android") setShowVisitDatePicker(false);
     if (date) {
       setVisitDateTime(date);
       setFormData({ ...formData, visit_date: date.toISOString() });
@@ -76,9 +152,7 @@ export default function CreateVisitScreen() {
   };
 
   const handleVisitTimeChange = (event: any, date?: Date) => {
-    if (Platform.OS === "android") {
-      setShowVisitTimePicker(false);
-    }
+    if (Platform.OS === "android") setShowVisitTimePicker(false);
     if (date) {
       const updated = new Date(visitDateTime);
       updated.setHours(date.getHours());
@@ -89,9 +163,7 @@ export default function CreateVisitScreen() {
   };
 
   const handleFollowUpDateChange = (event: any, date?: Date) => {
-    if (Platform.OS === "android") {
-      setShowFollowUpDatePicker(false);
-    }
+    if (Platform.OS === "android") setShowFollowUpDatePicker(false);
     if (date) {
       setFollowUpDate(date);
       setFormData({
@@ -101,57 +173,28 @@ export default function CreateVisitScreen() {
     }
   };
 
-  const formatDisplayDateTime = (isoString: string) => {
-    if (!isoString) return "";
-    const date = new Date(isoString);
-    return date.toLocaleString("en-GB", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const formatDisplayDate = (dateString: string) => {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-  };
+  const formatDisplayDate = (iso?: string) =>
+    iso
+      ? new Date(iso).toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        })
+      : "";
 
   const handleSubmit = async () => {
-    if (!activeMember?.id) {
-      Alert.alert("Error", "No member selected");
-      return;
-    }
-
-    if (!formData.status) {
-      Alert.alert("Error", "Please select visit status");
-      return;
-    }
-
-    if (!formData.visit_date) {
-      Alert.alert("Error", "Please select visit date and time");
-      return;
-    }
-
-    if (!formData.visit_type) {
-      Alert.alert("Error", "Please select visit type");
-      return;
-    }
-
-    if (!formData.reason.trim()) {
-      Alert.alert("Error", "Please enter reason for visit");
-      return;
-    }
+    if (!activeMember?.id) return Alert.alert("Error", "No member selected");
+    if (!formData.status)
+      return Alert.alert("Error", "Please select visit status");
+    if (!formData.visit_date)
+      return Alert.alert("Error", "Please select visit date and time");
+    if (!formData.visit_type)
+      return Alert.alert("Error", "Please select visit type");
+    if (!formData.reason.trim())
+      return Alert.alert("Error", "Please enter reason for visit");
 
     setLoading(true);
-
-    const visitData = {
+    const { error } = await createVisit({
       member_id: activeMember.id,
       visit_date: formData.visit_date,
       status: formData.status,
@@ -165,10 +208,7 @@ export default function CreateVisitScreen() {
         : formData.specialty || undefined,
       notes: formData.notes.trim() || undefined,
       follow_up_date: formData.follow_up_date || undefined,
-    };
-
-    const { data, error } = await createVisit(visitData);
-
+    });
     setLoading(false);
 
     if (error) {
@@ -180,225 +220,194 @@ export default function CreateVisitScreen() {
     }
   };
 
-  // Step 1: Status Selection
+  // ── Shared header ─────────────────────────────────────────────────────────
+
+  const Header = ({
+    title,
+    subtitle,
+    onBack,
+  }: {
+    title: string;
+    subtitle?: string;
+    onBack: () => void;
+  }) => (
+    <View
+      style={{ paddingTop: insets.top }}
+      className={`border-b ${
+        isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+      }`}
+    >
+      <View className="flex-row items-center justify-between px-4 py-3">
+        <TouchableOpacity
+          onPress={onBack}
+          className={`w-10 h-10 rounded-xl items-center justify-center ${
+            isDark ? "bg-slate-800" : "bg-slate-100"
+          }`}
+          accessibilityLabel="Go back"
+        >
+          <Ionicons
+            name="arrow-back"
+            size={20}
+            color={isDark ? colors.dark.textPrimary : colors.light.textPrimary}
+          />
+        </TouchableOpacity>
+        <View className="flex-1 items-center px-2">
+          <Text
+            className={`text-[17px] font-bold tracking-tight ${
+              isDark ? "text-slate-100" : "text-slate-900"
+            }`}
+          >
+            {title}
+          </Text>
+          {subtitle && (
+            <Text
+              className={`text-xs mt-0.5 ${
+                isDark ? "text-slate-400" : "text-slate-500"
+              }`}
+            >
+              {subtitle}
+            </Text>
+          )}
+        </View>
+        <View className="w-10" />
+      </View>
+    </View>
+  );
+
+  // ══ STEP 1: Status Selection ══════════════════════════════════════════════
+
   if (!formData.status) {
     return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: isDark
-            ? colors.dark.background
-            : colors.light.background,
-        }}
-      >
-        <View
-          style={{
-            paddingTop: insets.top,
-            backgroundColor: isDark ? colors.dark.card : colors.light.card,
-            borderBottomWidth: 1,
-            borderBottomColor: isDark
-              ? colors.dark.border
-              : colors.light.border,
-          }}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              paddingHorizontal: 16,
-              paddingBottom: 16,
-            }}
-          >
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={{ padding: 4 }}
-            >
-              <Ionicons
-                name="arrow-back"
-                size={24}
-                color={
-                  isDark ? colors.dark.textPrimary : colors.light.textPrimary
-                }
-              />
-            </TouchableOpacity>
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: "600",
-                color: isDark
-                  ? colors.dark.textPrimary
-                  : colors.light.textPrimary,
-              }}
-            >
-              Add Visit
-            </Text>
-            <View style={{ width: 24 }} />
-          </View>
-        </View>
+      <View className={`flex-1 ${isDark ? "bg-slate-950" : "bg-slate-50"}`}>
+        <Header
+          title="Add Visit"
+          subtitle={activeMember?.label}
+          onBack={() => router.back()}
+        />
 
-        <View style={{ flex: 1, justifyContent: "center", padding: 20 }}>
+        <View className="flex-1 justify-center px-5">
           <Text
-            style={{
-              fontSize: 24,
-              fontWeight: "600",
-              color: isDark
-                ? colors.dark.textPrimary
-                : colors.light.textPrimary,
-              marginBottom: 8,
-              textAlign: "center",
-            }}
+            className={`text-2xl font-bold text-center mb-2 ${
+              isDark ? "text-slate-100" : "text-slate-900"
+            }`}
           >
             What type of visit?
           </Text>
           <Text
-            style={{
-              fontSize: 15,
-              color: isDark
-                ? colors.dark.textSecondary
-                : colors.light.textSecondary,
-              marginBottom: 32,
-              textAlign: "center",
-            }}
+            className={`text-sm text-center mb-10 leading-5 ${
+              isDark ? "text-slate-400" : "text-slate-500"
+            }`}
           >
-            Choose whether you're scheduling a future visit or recording a past
-            one
+            Schedule a future appointment or{"\n"}record a past medical visit
           </Text>
 
+          {/* Upcoming */}
           <TouchableOpacity
-            style={{
-              backgroundColor: isDark ? colors.dark.card : colors.light.card,
-              borderRadius: 16,
-              padding: 24,
-              marginBottom: 16,
-              borderWidth: 2,
-              borderColor: isDark ? colors.dark.border : colors.light.border,
-            }}
             onPress={() => setFormData({ ...formData, status: "upcoming" })}
+            activeOpacity={0.8}
+            className={`rounded-2xl p-5 mb-4 border ${
+              isDark
+                ? "bg-slate-900 border-slate-800"
+                : "bg-white border-slate-200"
+            }`}
           >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                marginBottom: 12,
-              }}
-            >
+            <View className="flex-row items-center">
               <View
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 24,
-                  backgroundColor: colors.light.primary + "20",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  marginRight: 16,
-                }}
+                className="w-14 h-14 rounded-2xl items-center justify-center mr-4"
+                style={{ backgroundColor: colors.light.primary + "18" }}
               >
                 <Ionicons
                   name="calendar-outline"
-                  size={24}
+                  size={26}
                   color={colors.light.primary}
                 />
               </View>
-              <View style={{ flex: 1 }}>
+              <View className="flex-1">
                 <Text
-                  style={{
-                    fontSize: 18,
-                    fontWeight: "600",
-                    color: isDark
-                      ? colors.dark.textPrimary
-                      : colors.light.textPrimary,
-                    marginBottom: 4,
-                  }}
+                  className={`text-base font-semibold mb-0.5 ${
+                    isDark ? "text-slate-100" : "text-slate-900"
+                  }`}
                 >
                   Upcoming Visit
                 </Text>
                 <Text
-                  style={{
-                    fontSize: 14,
-                    color: isDark
-                      ? colors.dark.textSecondary
-                      : colors.light.textSecondary,
-                  }}
+                  className={`text-sm ${
+                    isDark ? "text-slate-400" : "text-slate-500"
+                  }`}
                 >
                   Schedule a future appointment
                 </Text>
               </View>
-              <Ionicons
-                name="chevron-forward"
-                size={24}
-                color={
-                  isDark ? colors.dark.textTertiary : colors.light.textTertiary
-                }
-              />
+              <View
+                className={`w-8 h-8 rounded-full items-center justify-center ${
+                  isDark ? "bg-slate-800" : "bg-slate-100"
+                }`}
+              >
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={
+                    isDark
+                      ? colors.dark.textTertiary
+                      : colors.light.textTertiary
+                  }
+                />
+              </View>
             </View>
           </TouchableOpacity>
 
+          {/* Completed */}
           <TouchableOpacity
-            style={{
-              backgroundColor: isDark ? colors.dark.card : colors.light.card,
-              borderRadius: 16,
-              padding: 24,
-              borderWidth: 2,
-              borderColor: isDark ? colors.dark.border : colors.light.border,
-            }}
             onPress={() => setFormData({ ...formData, status: "completed" })}
+            activeOpacity={0.8}
+            className={`rounded-2xl p-5 border ${
+              isDark
+                ? "bg-slate-900 border-slate-800"
+                : "bg-white border-slate-200"
+            }`}
           >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                marginBottom: 12,
-              }}
-            >
+            <View className="flex-row items-center">
               <View
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 24,
-                  backgroundColor: colors.light.success + "20",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  marginRight: 16,
-                }}
+                className="w-14 h-14 rounded-2xl items-center justify-center mr-4"
+                style={{ backgroundColor: colors.light.success + "18" }}
               >
                 <Ionicons
                   name="checkmark-circle-outline"
-                  size={24}
+                  size={26}
                   color={colors.light.success}
                 />
               </View>
-              <View style={{ flex: 1 }}>
+              <View className="flex-1">
                 <Text
-                  style={{
-                    fontSize: 18,
-                    fontWeight: "600",
-                    color: isDark
-                      ? colors.dark.textPrimary
-                      : colors.light.textPrimary,
-                    marginBottom: 4,
-                  }}
+                  className={`text-base font-semibold mb-0.5 ${
+                    isDark ? "text-slate-100" : "text-slate-900"
+                  }`}
                 >
                   Completed Visit
                 </Text>
                 <Text
-                  style={{
-                    fontSize: 14,
-                    color: isDark
-                      ? colors.dark.textSecondary
-                      : colors.light.textSecondary,
-                  }}
+                  className={`text-sm ${
+                    isDark ? "text-slate-400" : "text-slate-500"
+                  }`}
                 >
                   Record a past medical visit
                 </Text>
               </View>
-              <Ionicons
-                name="chevron-forward"
-                size={24}
-                color={
-                  isDark ? colors.dark.textTertiary : colors.light.textTertiary
-                }
-              />
+              <View
+                className={`w-8 h-8 rounded-full items-center justify-center ${
+                  isDark ? "bg-slate-800" : "bg-slate-100"
+                }`}
+              >
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={
+                    isDark
+                      ? colors.dark.textTertiary
+                      : colors.light.textTertiary
+                  }
+                />
+              </View>
             </View>
           </TouchableOpacity>
         </View>
@@ -406,659 +415,499 @@ export default function CreateVisitScreen() {
     );
   }
 
-  // Step 2: Visit Form
+  // ══ STEP 2: Main Form ════════════════════════════════════════════════════
+
+  const isUpcoming = formData.status === "upcoming";
+
   return (
-    <View
-      style={{
-        flex: 1,
-        backgroundColor: isDark
-          ? colors.dark.background
-          : colors.light.background,
-      }}
-    >
-      {/* Header */}
-      <View
-        style={{
-          paddingTop: insets.top,
-          backgroundColor: isDark ? colors.dark.card : colors.light.card,
-          borderBottomWidth: 1,
-          borderBottomColor: isDark ? colors.dark.border : colors.light.border,
-        }}
+    <View className={`flex-1 ${isDark ? "bg-slate-950" : "bg-slate-50"}`}>
+      <Header
+        title={isUpcoming ? "Schedule Visit" : "Record Visit"}
+        subtitle={activeMember?.label}
+        onBack={() => setFormData({ ...formData, status: "" })}
+      />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={0}
       >
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            paddingHorizontal: 16,
-            paddingBottom: 16,
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            padding: 8,
+            paddingBottom: insets.bottom + 50,
           }}
+          // keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <TouchableOpacity
-            onPress={() => setFormData({ ...formData, status: "" })}
-            style={{ padding: 4 }}
+          {/* ══ DATE & TIME ══ */}
+          <SectionLabel label="WHEN" isDark={isDark} />
+          <View
+            className={`rounded-2xl overflow-hidden border mb-5 ${
+              isDark
+                ? "bg-slate-900 border-slate-800"
+                : "bg-white border-slate-200"
+            }`}
           >
-            <Ionicons
-              name="arrow-back"
-              size={24}
-              color={
-                isDark ? colors.dark.textPrimary : colors.light.textPrimary
-              }
-            />
-          </TouchableOpacity>
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: "600",
-              color: isDark
-                ? colors.dark.textPrimary
-                : colors.light.textPrimary,
-            }}
-          >
-            {formData.status === "upcoming" ? "Schedule Visit" : "Record Visit"}
-          </Text>
-          <View style={{ width: 24 }} />
-        </View>
-      </View>
-
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
-        {/* Member Info */}
-        <View
-          style={{
-            backgroundColor: isDark ? colors.dark.card : colors.light.card,
-            padding: 12,
-            borderRadius: 8,
-            marginBottom: 16,
-            borderWidth: 1,
-            borderColor: isDark ? colors.dark.border : colors.light.border,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 12,
-              color: isDark
-                ? colors.dark.textTertiary
-                : colors.light.textTertiary,
-              marginBottom: 4,
-            }}
-          >
-            Adding visit for
-          </Text>
-          <Text
-            style={{
-              fontSize: 16,
-              fontWeight: "600",
-              color: isDark
-                ? colors.dark.textPrimary
-                : colors.light.textPrimary,
-            }}
-          >
-            {activeMember?.label}
-          </Text>
-        </View>
-
-        {/* Form Card */}
-        <View
-          style={{
-            backgroundColor: isDark ? colors.dark.card : colors.light.card,
-            borderRadius: 12,
-            padding: 16,
-            borderWidth: 1,
-            borderColor: isDark ? colors.dark.border : colors.light.border,
-          }}
-        >
-          {/* Visit Date & Time */}
-          <View style={{ marginBottom: 20 }}>
-            <Text
-              style={{
-                fontSize: 14,
-                fontWeight: "500",
-                color: isDark
-                  ? colors.dark.textSecondary
-                  : colors.light.textSecondary,
-                marginBottom: 8,
-              }}
-            >
-              Visit Date & Time *
-            </Text>
-            <View style={{ flexDirection: "row", gap: 8 }}>
+            <View className="px-4 py-3.5">
+              <FieldLabel label="Date" required isDark={isDark} />
               <TouchableOpacity
-                style={{
-                  flex: 1,
-                  backgroundColor: isDark
-                    ? colors.dark.background
-                    : colors.light.background,
-                  borderRadius: 8,
-                  padding: 14,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  borderWidth: 1,
-                  borderColor: isDark
-                    ? colors.dark.border
-                    : colors.light.border,
-                }}
                 onPress={() => setShowVisitDatePicker(true)}
+                activeOpacity={0.7}
               >
-                <Ionicons
-                  name="calendar-outline"
-                  size={18}
-                  color={
-                    isDark
-                      ? colors.dark.textTertiary
-                      : colors.light.textTertiary
-                  }
-                  style={{ marginRight: 8 }}
-                />
-                <Text
-                  style={{
-                    fontSize: 14,
-                    color: formData.visit_date
-                      ? isDark
-                        ? colors.dark.textPrimary
-                        : colors.light.textPrimary
-                      : isDark
-                        ? colors.dark.textTertiary
-                        : colors.light.textTertiary,
-                    flex: 1,
-                  }}
-                >
-                  {formData.visit_date
-                    ? new Date(formData.visit_date).toLocaleDateString(
-                        "en-GB",
-                        { day: "numeric", month: "short", year: "numeric" },
-                      )
-                    : "Date"}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={{
-                  backgroundColor: isDark
-                    ? colors.dark.background
-                    : colors.light.background,
-                  borderRadius: 8,
-                  padding: 14,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  minWidth: 100,
-                  borderWidth: 1,
-                  borderColor: isDark
-                    ? colors.dark.border
-                    : colors.light.border,
-                }}
-                onPress={() => setShowVisitTimePicker(true)}
-              >
-                <Ionicons
-                  name="time-outline"
-                  size={18}
-                  color={
-                    isDark
-                      ? colors.dark.textTertiary
-                      : colors.light.textTertiary
-                  }
-                  style={{ marginRight: 8 }}
-                />
-                <Text
-                  style={{
-                    fontSize: 14,
-                    color: formData.visit_date
-                      ? isDark
-                        ? colors.dark.textPrimary
-                        : colors.light.textPrimary
-                      : isDark
-                        ? colors.dark.textTertiary
-                        : colors.light.textTertiary,
-                  }}
-                >
-                  {formData.visit_date
-                    ? new Date(formData.visit_date).toLocaleTimeString(
-                        "en-GB",
-                        { hour: "2-digit", minute: "2-digit" },
-                      )
-                    : "Time"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {showVisitDatePicker && (
-              <DateTimePicker
-                value={visitDateTime}
-                mode="date"
-                display="default"
-                onChange={handleVisitDateChange}
-                themeVariant={isDark ? "dark" : "light"}
-              />
-            )}
-
-            {showVisitTimePicker && (
-              <DateTimePicker
-                value={visitDateTime}
-                mode="time"
-                display="default"
-                onChange={handleVisitTimeChange}
-                themeVariant={isDark ? "dark" : "light"}
-              />
-            )}
-          </View>
-
-          {/* Visit Type */}
-          <View style={{ marginBottom: 20 }}>
-            <Text
-              style={{
-                fontSize: 14,
-                fontWeight: "500",
-                color: isDark
-                  ? colors.dark.textSecondary
-                  : colors.light.textSecondary,
-                marginBottom: 8,
-              }}
-            >
-              Visit Type *
-            </Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-              {VISIT_TYPES.map((type) => (
-                <TouchableOpacity
-                  key={type}
-                  onPress={() => setFormData({ ...formData, visit_type: type })}
-                  style={{
-                    paddingVertical: 10,
-                    paddingHorizontal: 16,
-                    borderRadius: 8,
-                    backgroundColor:
-                      formData.visit_type === type
-                        ? colors.light.primary
-                        : isDark
-                          ? colors.dark.background
-                          : colors.light.background,
-                    borderWidth: 1,
-                    borderColor:
-                      formData.visit_type === type
-                        ? colors.light.primary
-                        : isDark
-                          ? colors.dark.border
-                          : colors.light.border,
-                  }}
-                >
+                <InputRow icon="calendar-outline" isDark={isDark}>
                   <Text
-                    style={{
-                      fontSize: 14,
-                      fontWeight: formData.visit_type === type ? "600" : "400",
-                      color:
-                        formData.visit_type === type
-                          ? "#fff"
-                          : isDark
-                            ? colors.dark.textPrimary
-                            : colors.light.textPrimary,
-                    }}
+                    className={`flex-1 text-[15px] px-3 py-3 ${
+                      formData.visit_date
+                        ? isDark
+                          ? "text-slate-100"
+                          : "text-slate-900"
+                        : isDark
+                          ? "text-slate-600"
+                          : "text-slate-400"
+                    }`}
                   >
-                    {type}
+                    {formData.visit_date
+                      ? new Date(formData.visit_date).toLocaleDateString(
+                          "en-GB",
+                          {
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          },
+                        )
+                      : "Select date"}
                   </Text>
-                </TouchableOpacity>
-              ))}
+                  {formData.visit_date ? (
+                    <TouchableOpacity
+                      onPress={() =>
+                        setFormData({ ...formData, visit_date: "" })
+                      }
+                      className="px-3"
+                    >
+                      <Ionicons
+                        name="close-circle"
+                        size={18}
+                        color={isDark ? "#475569" : "#94A3B8"}
+                      />
+                    </TouchableOpacity>
+                  ) : (
+                    <View className="px-3">
+                      <Ionicons
+                        name="chevron-forward"
+                        size={16}
+                        color={isDark ? "#475569" : "#94A3B8"}
+                      />
+                    </View>
+                  )}
+                </InputRow>
+              </TouchableOpacity>
+              {showVisitDatePicker && (
+                <DateTimePicker
+                  value={visitDateTime}
+                  mode="date"
+                  onChange={handleVisitDateChange}
+                  themeVariant={isDark ? "dark" : "light"}
+                />
+              )}
+            </View>
+
+            <Divider isDark={isDark} />
+
+            <View className="px-4 py-3.5">
+              <FieldLabel label="Time" isDark={isDark} />
+              <TouchableOpacity
+                onPress={() => setShowVisitTimePicker(true)}
+                activeOpacity={0.7}
+              >
+                <InputRow icon="time-outline" isDark={isDark}>
+                  <Text
+                    className={`flex-1 text-[15px] px-3 py-3 ${
+                      formData.visit_date
+                        ? isDark
+                          ? "text-slate-100"
+                          : "text-slate-900"
+                        : isDark
+                          ? "text-slate-600"
+                          : "text-slate-400"
+                    }`}
+                  >
+                    {formData.visit_date
+                      ? new Date(formData.visit_date).toLocaleTimeString(
+                          "en-GB",
+                          {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          },
+                        )
+                      : "Select time"}
+                  </Text>
+                  <View className="px-3">
+                    <Ionicons
+                      name="chevron-forward"
+                      size={16}
+                      color={isDark ? "#475569" : "#94A3B8"}
+                    />
+                  </View>
+                </InputRow>
+              </TouchableOpacity>
+              {showVisitTimePicker && (
+                <DateTimePicker
+                  value={visitDateTime}
+                  mode="time"
+                  onChange={handleVisitTimeChange}
+                  themeVariant={isDark ? "dark" : "light"}
+                />
+              )}
             </View>
           </View>
 
-          {/* Reason */}
-          <View style={{ marginBottom: 20 }}>
-            <Text
-              style={{
-                fontSize: 14,
-                fontWeight: "500",
-                color: isDark
-                  ? colors.dark.textSecondary
-                  : colors.light.textSecondary,
-                marginBottom: 8,
-              }}
-            >
-              Reason for Visit *
-            </Text>
-            <TextInput
-              style={{
-                backgroundColor: isDark
-                  ? colors.dark.background
-                  : colors.light.background,
-                borderRadius: 8,
-                padding: 14,
-                fontSize: 16,
-                color: isDark
-                  ? colors.dark.textPrimary
-                  : colors.light.textPrimary,
-                minHeight: 80,
-                textAlignVertical: "top",
-                borderWidth: 1,
-                borderColor: isDark ? colors.dark.border : colors.light.border,
-              }}
-              value={formData.reason}
-              onChangeText={(text) =>
-                setFormData({ ...formData, reason: text })
-              }
-              placeholder="e.g., Annual checkup, Follow-up consultation..."
-              placeholderTextColor={
-                isDark ? colors.dark.textTertiary : colors.light.textTertiary
-              }
-              multiline
-            />
-          </View>
-
-          {/* Doctor Name */}
-          <View style={{ marginBottom: 20 }}>
-            <Text
-              style={{
-                fontSize: 14,
-                fontWeight: "500",
-                color: isDark
-                  ? colors.dark.textSecondary
-                  : colors.light.textSecondary,
-                marginBottom: 8,
-              }}
-            >
-              Doctor Name
-            </Text>
-            <TextInput
-              style={{
-                backgroundColor: isDark
-                  ? colors.dark.background
-                  : colors.light.background,
-                borderRadius: 8,
-                padding: 14,
-                fontSize: 16,
-                color: isDark
-                  ? colors.dark.textPrimary
-                  : colors.light.textPrimary,
-                borderWidth: 1,
-                borderColor: isDark ? colors.dark.border : colors.light.border,
-              }}
-              value={formData.doctor_name}
-              onChangeText={(text) =>
-                setFormData({ ...formData, doctor_name: text })
-              }
-              placeholder="Dr. Smith"
-              placeholderTextColor={
-                isDark ? colors.dark.textTertiary : colors.light.textTertiary
-              }
-            />
-          </View>
-
-          {/* Hospital/Clinic */}
-          <View style={{ marginBottom: 20 }}>
-            <Text
-              style={{
-                fontSize: 14,
-                fontWeight: "500",
-                color: isDark
-                  ? colors.dark.textSecondary
-                  : colors.light.textSecondary,
-                marginBottom: 8,
-              }}
-            >
-              Hospital / Clinic Name
-            </Text>
-            <TextInput
-              style={{
-                backgroundColor: isDark
-                  ? colors.dark.background
-                  : colors.light.background,
-                borderRadius: 8,
-                padding: 14,
-                fontSize: 16,
-                color: isDark
-                  ? colors.dark.textPrimary
-                  : colors.light.textPrimary,
-                borderWidth: 1,
-                borderColor: isDark ? colors.dark.border : colors.light.border,
-              }}
-              value={formData.hospital_or_clinic_name}
-              onChangeText={(text) =>
-                setFormData({ ...formData, hospital_or_clinic_name: text })
-              }
-              placeholder="City Hospital"
-              placeholderTextColor={
-                isDark ? colors.dark.textTertiary : colors.light.textTertiary
-              }
-            />
-          </View>
-
-          {/* Specialty */}
-          <View style={{ marginBottom: 20 }}>
-            <Text
-              style={{
-                fontSize: 14,
-                fontWeight: "500",
-                color: isDark
-                  ? colors.dark.textSecondary
-                  : colors.light.textSecondary,
-                marginBottom: 8,
-              }}
-            >
-              Specialty
-            </Text>
-            {!showCustomSpecialty ? (
-              <>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    flexWrap: "wrap",
-                    gap: 8,
-                    marginBottom: 8,
-                  }}
-                >
-                  {COMMON_SPECIALTIES.map((specialty) => (
+          {/* ══ VISIT TYPE ══ */}
+          <SectionLabel label="VISIT TYPE" isDark={isDark} />
+          <View
+            className={`rounded-2xl overflow-hidden border mb-5 ${
+              isDark
+                ? "bg-slate-900 border-slate-800"
+                : "bg-white border-slate-200"
+            }`}
+          >
+            <View className="px-4 py-3.5">
+              <FieldLabel label="Type" required isDark={isDark} />
+              <View className="flex-row flex-wrap gap-2">
+                {VISIT_TYPES.map((type) => {
+                  const isSelected = formData.visit_type === type;
+                  return (
                     <TouchableOpacity
-                      key={specialty}
-                      onPress={() => {
-                        if (specialty === "Other") {
-                          setShowCustomSpecialty(true);
-                        } else {
-                          setFormData({ ...formData, specialty });
-                        }
-                      }}
-                      style={{
-                        paddingVertical: 10,
-                        paddingHorizontal: 16,
-                        borderRadius: 8,
-                        backgroundColor:
-                          formData.specialty === specialty
-                            ? colors.light.primary
-                            : isDark
-                              ? colors.dark.background
-                              : colors.light.background,
-                        borderWidth: 1,
-                        borderColor:
-                          formData.specialty === specialty
-                            ? colors.light.primary
-                            : isDark
-                              ? colors.dark.border
-                              : colors.light.border,
-                      }}
+                      key={type}
+                      onPress={() =>
+                        setFormData({ ...formData, visit_type: type })
+                      }
+                      activeOpacity={0.75}
+                      className={`px-3.5 py-2 rounded-xl border ${
+                        isSelected
+                          ? "bg-cyan-500/10 border-cyan-500"
+                          : isDark
+                            ? "bg-slate-800 border-slate-700"
+                            : "bg-slate-50 border-slate-200"
+                      }`}
+                      style={{ borderWidth: isSelected ? 1.5 : 1 }}
                     >
                       <Text
-                        style={{
-                          fontSize: 13,
-                          fontWeight:
-                            formData.specialty === specialty ? "600" : "400",
-                          color:
-                            formData.specialty === specialty
-                              ? "#fff"
-                              : isDark
-                                ? colors.dark.textPrimary
-                                : colors.light.textPrimary,
-                        }}
+                        className={`text-[13px] ${
+                          isSelected
+                            ? "text-cyan-600"
+                            : isDark
+                              ? "text-slate-400"
+                              : "text-slate-500"
+                        }`}
+                        style={{ fontWeight: isSelected ? "600" : "400" }}
                       >
-                        {specialty}
+                        {type}
                       </Text>
                     </TouchableOpacity>
-                  ))}
-                </View>
-              </>
-            ) : (
-              <View>
-                <TextInput
-                  style={{
-                    backgroundColor: isDark
-                      ? colors.dark.background
-                      : colors.light.background,
-                    borderRadius: 8,
-                    padding: 14,
-                    fontSize: 16,
-                    color: isDark
-                      ? colors.dark.textPrimary
-                      : colors.light.textPrimary,
-                    borderWidth: 1,
-                    borderColor: isDark
-                      ? colors.dark.border
-                      : colors.light.border,
-                    marginBottom: 8,
-                  }}
-                  value={customSpecialty}
-                  onChangeText={setCustomSpecialty}
-                  placeholder="Enter custom specialty"
-                  placeholderTextColor={
-                    isDark
-                      ? colors.dark.textTertiary
-                      : colors.light.textTertiary
-                  }
-                />
-                <TouchableOpacity
-                  onPress={() => {
-                    setShowCustomSpecialty(false);
-                    setCustomSpecialty("");
-                  }}
-                >
-                  <Text style={{ color: colors.light.primary, fontSize: 14 }}>
-                    ← Back to predefined options
-                  </Text>
-                </TouchableOpacity>
+                  );
+                })}
               </View>
-            )}
+            </View>
           </View>
 
-          {/* Notes */}
-          <View style={{ marginBottom: 20 }}>
-            <Text
-              style={{
-                fontSize: 14,
-                fontWeight: "500",
-                color: isDark
-                  ? colors.dark.textSecondary
-                  : colors.light.textSecondary,
-                marginBottom: 8,
-              }}
-            >
-              Notes
-            </Text>
-            <TextInput
-              style={{
-                backgroundColor: isDark
-                  ? colors.dark.background
-                  : colors.light.background,
-                borderRadius: 8,
-                padding: 14,
-                fontSize: 16,
-                color: isDark
-                  ? colors.dark.textPrimary
-                  : colors.light.textPrimary,
-                minHeight: 80,
-                textAlignVertical: "top",
-                borderWidth: 1,
-                borderColor: isDark ? colors.dark.border : colors.light.border,
-              }}
-              value={formData.notes}
-              onChangeText={(text) => setFormData({ ...formData, notes: text })}
-              placeholder="Additional notes or observations..."
-              placeholderTextColor={
-                isDark ? colors.dark.textTertiary : colors.light.textTertiary
-              }
-              multiline
-            />
-          </View>
-
-          {/* Follow-up Date */}
-          <View style={{ marginBottom: 20 }}>
-            <Text
-              style={{
-                fontSize: 14,
-                fontWeight: "500",
-                color: isDark
-                  ? colors.dark.textSecondary
-                  : colors.light.textSecondary,
-                marginBottom: 8,
-              }}
-            >
-              Follow-up Date
-            </Text>
-            <TouchableOpacity
-              style={{
-                backgroundColor: isDark
-                  ? colors.dark.background
-                  : colors.light.background,
-                borderRadius: 8,
-                padding: 14,
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-                borderWidth: 1,
-                borderColor: isDark ? colors.dark.border : colors.light.border,
-              }}
-              onPress={() => setShowFollowUpDatePicker(true)}
-            >
-              <Text
-                style={{
-                  fontSize: 16,
-                  color: formData.follow_up_date
-                    ? isDark
-                      ? colors.dark.textPrimary
-                      : colors.light.textPrimary
-                    : isDark
-                      ? colors.dark.textTertiary
-                      : colors.light.textTertiary,
-                }}
+          {/* ══ REASON ══ */}
+          <SectionLabel label="DETAILS" isDark={isDark} />
+          <View
+            className={`rounded-2xl overflow-hidden border mb-5 ${
+              isDark
+                ? "bg-slate-900 border-slate-800"
+                : "bg-white border-slate-200"
+            }`}
+          >
+            {/* Reason */}
+            <View className="px-4 py-3.5">
+              <FieldLabel label="Reason for Visit" required isDark={isDark} />
+              <View
+                className={`rounded-xl border p-3.5 min-h-[88px] ${
+                  isDark
+                    ? "bg-slate-800 border-slate-700"
+                    : "bg-slate-50 border-slate-200"
+                }`}
               >
-                {formData.follow_up_date
-                  ? formatDisplayDate(formData.follow_up_date)
-                  : "Select date"}
-              </Text>
-              <Ionicons
-                name="calendar-outline"
-                size={20}
-                color={
-                  isDark ? colors.dark.textTertiary : colors.light.textTertiary
-                }
-              />
-            </TouchableOpacity>
+                <TextInput
+                  className={`text-[15px] min-h-[60px] ${
+                    isDark ? "text-slate-100" : "text-slate-900"
+                  }`}
+                  value={formData.reason}
+                  onChangeText={(t) =>
+                    setFormData((p) => ({ ...p, reason: t }))
+                  }
+                  placeholder="e.g. Annual checkup, chest pain..."
+                  placeholderTextColor={isDark ? "#475569" : "#94A3B8"}
+                  multiline
+                  textAlignVertical="top"
+                />
+              </View>
+            </View>
 
-            {showFollowUpDatePicker && (
-              <DateTimePicker
-                value={followUpDate}
-                mode="date"
-                display="default"
-                onChange={handleFollowUpDateChange}
-                minimumDate={new Date()}
-                themeVariant={isDark ? "dark" : "light"}
-              />
-            )}
+            <Divider isDark={isDark} />
+
+            {/* Doctor */}
+            <View className="px-4 py-3.5">
+              <FieldLabel label="Doctor" isDark={isDark} />
+              <InputRow icon="person-outline" isDark={isDark}>
+                <TextInput
+                  className={`flex-1 text-[15px] px-3 py-3 ${
+                    isDark ? "text-slate-100" : "text-slate-900"
+                  }`}
+                  value={formData.doctor_name}
+                  onChangeText={(t) =>
+                    setFormData((p) => ({ ...p, doctor_name: t }))
+                  }
+                  placeholder="Dr. Name"
+                  placeholderTextColor={isDark ? "#475569" : "#94A3B8"}
+                />
+              </InputRow>
+            </View>
+
+            <Divider isDark={isDark} />
+
+            {/* Clinic */}
+            <View className="px-4 py-3.5">
+              <FieldLabel label="Clinic / Hospital" isDark={isDark} />
+              <InputRow icon="business-outline" isDark={isDark}>
+                <TextInput
+                  className={`flex-1 text-[15px] px-3 py-3 ${
+                    isDark ? "text-slate-100" : "text-slate-900"
+                  }`}
+                  value={formData.hospital_or_clinic_name}
+                  onChangeText={(t) =>
+                    setFormData((p) => ({ ...p, hospital_or_clinic_name: t }))
+                  }
+                  placeholder="Clinic or hospital name"
+                  placeholderTextColor={isDark ? "#475569" : "#94A3B8"}
+                />
+              </InputRow>
+            </View>
+
+            <Divider isDark={isDark} />
+
+            {/* Notes */}
+            <View className="px-4 py-3.5">
+              <FieldLabel label="Notes" isDark={isDark} />
+              <View
+                className={`rounded-xl border p-3.5 min-h-[88px] ${
+                  isDark
+                    ? "bg-slate-800 border-slate-700"
+                    : "bg-slate-50 border-slate-200"
+                }`}
+              >
+                <TextInput
+                  className={`text-[15px] min-h-[60px] ${
+                    isDark ? "text-slate-100" : "text-slate-900"
+                  }`}
+                  value={formData.notes}
+                  onChangeText={(t) => setFormData((p) => ({ ...p, notes: t }))}
+                  placeholder="Additional observations or instructions..."
+                  placeholderTextColor={isDark ? "#475569" : "#94A3B8"}
+                  multiline
+                  textAlignVertical="top"
+                />
+              </View>
+            </View>
           </View>
-        </View>
 
-        {/* Save Button */}
-        <TouchableOpacity
-          style={{
-            backgroundColor: colors.light.primary,
-            padding: 16,
-            borderRadius: 12,
-            alignItems: "center",
-            marginTop: 16,
-            opacity: loading ? 0.5 : 1,
-          }}
-          onPress={handleSubmit}
-          disabled={loading}
-        >
-          <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600" }}>
-            {loading
-              ? "Saving..."
-              : `Save ${formData.status === "upcoming" ? "Appointment" : "Visit"}`}
-          </Text>
-        </TouchableOpacity>
-      </ScrollView>
+          {/* ══ SPECIALTY ══ */}
+          <SectionLabel label="SPECIALTY" isDark={isDark} />
+          <View
+            className={`rounded-2xl overflow-hidden border mb-5 ${
+              isDark
+                ? "bg-slate-900 border-slate-800"
+                : "bg-white border-slate-200"
+            }`}
+          >
+            <View className="px-4 py-3.5">
+              <FieldLabel label="Medical Specialty" isDark={isDark} />
+              {!showCustomSpecialty ? (
+                <View className="flex-row flex-wrap gap-2">
+                  {COMMON_SPECIALTIES.map((spec) => {
+                    const isSelected = formData.specialty === spec;
+                    return (
+                      <TouchableOpacity
+                        key={spec}
+                        onPress={() => {
+                          if (spec === "Other") {
+                            setShowCustomSpecialty(true);
+                          } else {
+                            setFormData((p) => ({ ...p, specialty: spec }));
+                          }
+                        }}
+                        activeOpacity={0.75}
+                        className={`px-3.5 py-2 rounded-xl border ${
+                          isSelected
+                            ? "bg-cyan-500/10 border-cyan-500"
+                            : isDark
+                              ? "bg-slate-800 border-slate-700"
+                              : "bg-slate-50 border-slate-200"
+                        }`}
+                        style={{ borderWidth: isSelected ? 1.5 : 1 }}
+                      >
+                        <Text
+                          className={`text-[13px] ${
+                            isSelected
+                              ? "text-cyan-600"
+                              : isDark
+                                ? "text-slate-400"
+                                : "text-slate-500"
+                          }`}
+                          style={{ fontWeight: isSelected ? "600" : "400" }}
+                        >
+                          {spec}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : (
+                <View>
+                  <InputRow icon="create-outline" isDark={isDark}>
+                    <TextInput
+                      className={`flex-1 text-[15px] px-3 py-3 ${
+                        isDark ? "text-slate-100" : "text-slate-900"
+                      }`}
+                      value={customSpecialty}
+                      onChangeText={setCustomSpecialty}
+                      placeholder="Enter specialty..."
+                      placeholderTextColor={isDark ? "#475569" : "#94A3B8"}
+                      autoFocus
+                    />
+                  </InputRow>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setShowCustomSpecialty(false);
+                      setCustomSpecialty("");
+                    }}
+                    className="mt-2.5 flex-row items-center"
+                  >
+                    <Ionicons
+                      name="arrow-back-outline"
+                      size={14}
+                      color={colors.light.primary}
+                      style={{ marginRight: 4 }}
+                    />
+                    <Text className="text-[13px] text-cyan-600 font-medium">
+                      Back to common options
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* ══ FOLLOW-UP ══ */}
+          <SectionLabel label="FOLLOW-UP" isDark={isDark} />
+          <View
+            className={`rounded-2xl overflow-hidden border mb-6 ${
+              isDark
+                ? "bg-slate-900 border-slate-800"
+                : "bg-white border-slate-200"
+            }`}
+          >
+            <View className="px-4 py-3.5">
+              <FieldLabel label="Follow-up Date" isDark={isDark} />
+              <Text
+                className={`text-[11px] mb-3 -mt-1 ${
+                  isDark ? "text-slate-600" : "text-slate-400"
+                }`}
+              >
+                Optional · tap to set a reminder date
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowFollowUpDatePicker(true)}
+                activeOpacity={0.7}
+              >
+                <InputRow icon="calendar-outline" isDark={isDark}>
+                  <Text
+                    className={`flex-1 text-[15px] px-3 py-3 ${
+                      formData.follow_up_date
+                        ? isDark
+                          ? "text-slate-100"
+                          : "text-slate-900"
+                        : isDark
+                          ? "text-slate-600"
+                          : "text-slate-400"
+                    }`}
+                  >
+                    {formData.follow_up_date
+                      ? formatDisplayDate(formData.follow_up_date)
+                      : "Not set"}
+                  </Text>
+                  {formData.follow_up_date ? (
+                    <TouchableOpacity
+                      onPress={() =>
+                        setFormData({ ...formData, follow_up_date: "" })
+                      }
+                      className="px-3"
+                    >
+                      <Ionicons
+                        name="close-circle"
+                        size={18}
+                        color={isDark ? "#475569" : "#94A3B8"}
+                      />
+                    </TouchableOpacity>
+                  ) : (
+                    <View className="px-3">
+                      <Ionicons
+                        name="chevron-forward"
+                        size={16}
+                        color={isDark ? "#475569" : "#94A3B8"}
+                      />
+                    </View>
+                  )}
+                </InputRow>
+              </TouchableOpacity>
+              {showFollowUpDatePicker && (
+                <DateTimePicker
+                  value={followUpDate}
+                  mode="date"
+                  onChange={handleFollowUpDateChange}
+                  minimumDate={new Date()}
+                  themeVariant={isDark ? "dark" : "light"}
+                />
+              )}
+            </View>
+          </View>
+
+          {/* ══ SUBMIT ══ */}
+          <TouchableOpacity
+            onPress={handleSubmit}
+            disabled={loading}
+            activeOpacity={0.85}
+            className="rounded-2xl py-[17px] items-center justify-center flex-row"
+            style={{
+              backgroundColor: colors.light.primary,
+              opacity: loading ? 0.65 : 1,
+              shadowColor: colors.light.primary,
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 0.4,
+              shadowRadius: 14,
+              elevation: 8,
+            }}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Ionicons
+                  name={isUpcoming ? "calendar-outline" : "save-outline"}
+                  size={20}
+                  color="#fff"
+                  style={{ marginRight: 8 }}
+                />
+                <Text className="text-white text-base font-bold tracking-wide">
+                  {isUpcoming ? "Schedule Visit" : "Save Visit"}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

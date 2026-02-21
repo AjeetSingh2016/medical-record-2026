@@ -1,9 +1,15 @@
 import { useColorScheme } from "@/components/useColorScheme";
 import { colors } from "@/lib/colors";
+import { getFamilyMembers } from "@/lib/database";
+import { useAuth } from "@/lib/useAuth";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback } from "react";
 import { Text, TouchableOpacity, View } from "react-native";
+
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ProfileSwitcher } from "./ProfileSwitcher";
 
@@ -16,6 +22,24 @@ export function CustomHeader({ onProfilePress }: CustomHeaderProps) {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
+  const { session } = useAuth();
+  const [hasMultipleMembers, setHasMultipleMembers] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (session?.user?.id) {
+        checkMembers();
+      }
+    }, [session]),
+  );
+  const checkMembers = async () => {
+    if (!session?.user?.id) return;
+    const { data } = await getFamilyMembers(session.user.id);
+    // Only show switcher if there are family members besides Self
+    const nonSelfMembers =
+      data?.filter((m) => m.relation?.toLowerCase() !== "self") || [];
+    setHasMultipleMembers(nonSelfMembers.length > 0);
+  };
 
   return (
     <View
@@ -28,7 +52,10 @@ export function CustomHeader({ onProfilePress }: CustomHeaderProps) {
     >
       {/* Header Content */}
       <View className="px-4 py-4">
-        <View className="flex-row items-center justify-between mb-3">
+        <View
+          className="flex-row items-center justify-between"
+          style={{ marginBottom: hasMultipleMembers ? 12 : 0 }}
+        >
           {/* Logo/Brand */}
           <View className="flex-row items-center gap-2">
             <View
@@ -57,8 +84,8 @@ export function CustomHeader({ onProfilePress }: CustomHeaderProps) {
           </TouchableOpacity>
         </View>
 
-        {/* Profile Switcher */}
-        <ProfileSwitcher onPress={onProfilePress} />
+        {/* Profile Switcher - only show when multiple members */}
+        {hasMultipleMembers && <ProfileSwitcher onPress={onProfilePress} />}
       </View>
     </View>
   );

@@ -10,6 +10,34 @@ export async function getProfile(userId: string) {
 
   return { data, error };
 }
+
+export async function createProfile(profile: {
+  id: string;
+  email: string;
+  full_name: string;
+  phone?: string;
+  dob?: string;
+  gender?: string;
+  blood_group?: string;
+  avatar_url?: string;
+}) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .insert({
+      id: profile.id,
+      email: profile.email,
+      full_name: profile.full_name,
+      phone: profile.phone,
+      dob: profile.dob,
+      gender: profile.gender,
+      blood_group: profile.blood_group,
+      avatar_url: profile.avatar_url,
+    })
+    .select()
+    .single();
+
+  return { data, error };
+}
 export async function updateProfile(
   userId: string,
   updates: {

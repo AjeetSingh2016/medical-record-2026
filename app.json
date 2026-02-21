@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "medical-record-2026",
+    "name": "MediVault",
     "slug": "medical-record-2026",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -22,8 +22,9 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "edgeToEdgeEnabled": false,
+      "predictiveBackGestureEnabled": false,
+      "softwareKeyboardLayoutMode": "pan"
     },
     "web": {
       "bundler": "metro",
@@ -38,6 +39,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "fbc6026b-fdb8-4e30-8598-2be52cc3f9d8"
+      }
     }
   }
 }

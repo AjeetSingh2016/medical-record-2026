@@ -15,6 +15,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -77,10 +78,10 @@ export default function ProfileScreen() {
     if (error) {
       Alert.alert("Error", "Failed to update profile");
     } else {
-      // Reload profile
       loadProfile();
     }
   };
+
   const handleSignOut = async () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
@@ -98,6 +99,15 @@ export default function ProfileScreen() {
         },
       },
     ]);
+  };
+
+  const handleOpenLink = async (url: string) => {
+    const supported = await Linking.canOpenURL(url);
+    if (supported) {
+      await Linking.openURL(url);
+    } else {
+      Alert.alert("Error", "Unable to open this link");
+    }
   };
 
   useEffect(() => {
@@ -123,14 +133,30 @@ export default function ProfileScreen() {
     )}&background=0F766E&color=fff&size=256`;
 
   const appOptions = [
-    { id: "about", label: "About", icon: "information-circle-outline" },
-    { id: "terms", label: "Terms & Conditions", icon: "document-text-outline" },
+    {
+      id: "about",
+      label: "About",
+      icon: "information-circle-outline",
+      url: "https://medical-record-web-umber.vercel.app/app/about",
+    },
+    {
+      id: "terms",
+      label: "Terms & Conditions",
+      icon: "document-text-outline",
+      url: "https://medical-record-web-umber.vercel.app/app/terms-condition",
+    },
     {
       id: "privacy",
       label: "Privacy Policy",
       icon: "shield-checkmark-outline",
+      url: "https://medical-record-web-umber.vercel.app/app/privacy-policy",
     },
-    { id: "contact", label: "Contact Us", icon: "mail-outline" },
+    {
+      id: "contact",
+      label: "Contact Us",
+      icon: "mail-outline",
+      url: "https://medical-record-web-umber.vercel.app/app/contact",
+    },
   ];
 
   const accountFields = [
@@ -310,7 +336,7 @@ export default function ProfileScreen() {
                 <TouchableOpacity
                   key={option.id}
                   className={`px-4 py-3.5 flex-row items-center justify-between ${index !== appOptions.length - 1 ? `border-b ${isDark ? "border-slate-800" : "border-slate-200"}` : ""}`}
-                  onPress={() => Alert.alert(option.label, "Coming soon")}
+                  onPress={() => handleOpenLink(option.url)}
                 >
                   <View className="flex-row items-center flex-1">
                     <View

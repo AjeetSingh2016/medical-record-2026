@@ -10,6 +10,8 @@ import BottomSheet, {
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Text, TouchableOpacity } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback } from "react";
 interface FamilyMember {
   id: string;
   full_name: string;
@@ -29,11 +31,13 @@ export function ProfileBottomSheet({
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const snapPoints = useMemo(() => ["50%", "75%"], []);
 
-  useEffect(() => {
-    if (session?.user?.id) {
-      loadFamilyMembers();
-    }
-  }, [session]);
+  useFocusEffect(
+    useCallback(() => {
+      if (session?.user?.id) {
+        loadFamilyMembers();
+      }
+    }, [session]),
+  );
 
   const loadFamilyMembers = async () => {
     if (!session?.user?.id) return;

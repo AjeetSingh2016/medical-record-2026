@@ -9,7 +9,11 @@ export function useAuth() {
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      //   console.log("Initial session:", session);
+      console.log(
+        "✅ Initial session check:",
+        session ? "LOGGED IN" : "NOT LOGGED IN",
+      );
+      console.log("Session details:", session);
       setSession(session);
       setLoading(false);
     });
@@ -18,14 +22,13 @@ export function useAuth() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      //   console.log("Auth state changed:", _event, session);
+      console.log("🔄 Auth state changed:", _event);
+      console.log("New session:", session);
       setSession(session);
     });
 
     return () => subscription.unsubscribe();
   }, []);
-
-  //   console.log("Current session in useAuth:", session);
 
   return { session, loading };
 }
